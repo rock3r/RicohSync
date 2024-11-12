@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+option java_package = "dev.sebastiano.ricohsync.proto";
+option java_multiple_files = true;
+
+message SelectedDevice {
+  string macAddress = 1;
+  optional string name = 2;
+}
+
+message SelectedDevices {
+  optional SelectedDevice selectedDevice = 1;
+  bool hasSelectedDevice = 2;
+}
