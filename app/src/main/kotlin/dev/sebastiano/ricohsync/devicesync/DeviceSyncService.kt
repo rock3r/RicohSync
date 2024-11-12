@@ -9,6 +9,7 @@ import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.location.Location
 import android.os.Binder
+import android.os.Build
 import android.os.IBinder
 import android.os.Looper
 import android.util.Log
@@ -200,27 +201,47 @@ internal class DeviceSyncService : Service(), CoroutineScope {
                     }
                 }
 
-            peripheral.connect()
+            try {
+                peripheral.connect()
+                setPairedDeviceName(peripheral)
+                readFirmwareVersion(peripheral)
 
-            val nameCharacteristic =
-                characteristicOf(
-                    "9A50F291746-0C80-4726-87A7-3C501FD3B4B6",
-                    "FE3A32F8-A189-42DE-A391-BC81AE4DAA76",
-                )
-            peripheral.write(nameCharacteristic, "test".toByteArray())
-
-            val firmwareCharacteristic =
-                characteristicOf(
-                    "9A5ED1C5-74CC-4C50-B5B6-66A48E7CCFF1",
-                    "B4EB8905-7411-40A6-A367-2834C2157EA7",
-                )
-            val firmwareVersion = peripheral.read(firmwareCharacteristic).toString()
-            println("Firmware version: $firmwareVersion")
-
-            syncLocationAndTimeWith(peripheral)
-            _state.value = State.Syncing(peripheral, null, null)
+                _state.value = State.Syncing(peripheral, null, null)
+                syncLocationAndTimeWith(peripheral)
+            } catch (e: Exception) {
+                Log.e("Ricooola", "Error:", e)
+            }
         }
         _state.value = State.Connecting(advertisement)
+    }
+
+    private suspend fun setPairedDeviceName(peripheral: Peripheral) {
+        val service =
+            peripheral.services.orEmpty().first {
+                it.serviceUuid.toString() == "0f291746-0c80-4726-87a7-3c501fd3b4b6"
+            }
+
+        val char =
+            service.characteristics.first {
+                it.characteristicUuid.toString() == "fe3a32f8-a189-42de-a391-bc81ae4daa76"
+            }
+
+        peripheral.write(char, "${Build.MODEL} RicohSync".toByteArray())
+    }
+
+    private suspend fun readFirmwareVersion(peripheral: Peripheral) {
+        val service =
+            peripheral.services.orEmpty().first {
+                it.serviceUuid.toString() == "9a5ed1c5-74cc-4c50-b5b6-66a48e7ccff1"
+            }
+
+        val char =
+            service.characteristics.first {
+                it.characteristicUuid.toString() == "b4eb8905-7411-40a6-a367-2834c2157ea7"
+            }
+
+        val firmwareVersion = peripheral.read(char)
+        println("Firmware version: ${firmwareVersion.toString(Charsets.UTF_8).trimEnd(Char(0))}")
     }
 
     private suspend fun syncLocationAndTimeWith(peripheral: Peripheral) {
@@ -239,9 +260,10 @@ internal class DeviceSyncService : Service(), CoroutineScope {
         }
     }
 
+    @OptIn(ExperimentalStdlibApi::class)
     private fun computeSyncDataBytes(location: Location, dateTime: ZonedDateTime): ByteArray {
         val buffer =
-            ByteBuffer.allocate(264).order(ByteOrder.LITTLE_ENDIAN) // Assuming little-endianness
+            ByteBuffer.allocate(80).order(ByteOrder.LITTLE_ENDIAN) // Assuming little-endianness
 
         // Latitude and Longitude (Float64, 8 bytes each)
         buffer.putFloat(location.latitude.toFloat())
@@ -262,10 +284,12 @@ internal class DeviceSyncService : Service(), CoroutineScope {
 
         // Time Zone (String, 6 bytes + null terminator)
         val timeZone = formatZoneOffset(dateTime.offset)
-        buffer.put(timeZone.toByteArray())
+        buffer.put(timeZone.toByteArray(Charsets.UTF_8))
 
         // Datum (Byte, 1 byte)
         buffer.put(0.toByte()) // Assuming WGS84
+
+        Log.i("RicohSync", "Computed data (${buffer.array().size} bytes): ${buffer.array()}")
 
         return buffer.array()
     }
