@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Sync
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -31,11 +32,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.delay
+import com.juul.kable.ExperimentalApi
 import java.util.Locale
 import kotlin.time.Duration.Companion.seconds
+import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -46,16 +47,15 @@ internal fun DeviceSyncScreen(viewModel: DeviceSyncViewModel) {
         topBar = { TopAppBar(title = { Text("Syncing with camera") }) },
     ) { insets ->
         Box(
-            Modifier
-                .fillMaxSize()
-                .padding(insets)
-                .padding(16.dp),
+            Modifier.fillMaxSize().padding(insets).padding(16.dp),
             contentAlignment = Alignment.Center,
         ) {
             when (val currentState = state) {
                 DeviceSyncState.Starting -> Starting()
                 is DeviceSyncState.Connecting -> Connecting(currentState)
                 is DeviceSyncState.Syncing -> Syncing(currentState)
+                is DeviceSyncState.Disconnected -> Reconnecting(currentState)
+                DeviceSyncState.Stopped -> Stopped { viewModel.connectAndSync() }
             }
         }
     }
@@ -90,24 +90,25 @@ private fun Connecting(state: DeviceSyncState.Connecting) {
     }
 }
 
+@OptIn(ExperimentalApi::class)
 @Composable
 private fun Syncing(state: DeviceSyncState.Syncing) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         val rotateAnimation = rememberInfiniteTransition("sync_rotation")
-        val rotation by rotateAnimation.animateFloat(
-            0f,
-            -1 * 360f,
-            animationSpec = InfiniteRepeatableSpec(
-                tween(durationMillis = 1000, delayMillis = 800, easing = EaseInOut),
-                repeatMode = RepeatMode.Restart
+        val rotation by
+            rotateAnimation.animateFloat(
+                0f,
+                -1 * 360f,
+                animationSpec =
+                    InfiniteRepeatableSpec(
+                        tween(durationMillis = 1000, delayMillis = 800, easing = EaseInOut),
+                        repeatMode = RepeatMode.Restart,
+                    ),
             )
-        )
         Icon(
             Icons.Rounded.Sync,
             contentDescription = null,
-            modifier = Modifier
-                .size(64.dp)
-                .rotate(rotation)
+            modifier = Modifier.size(64.dp).rotate(rotation),
         )
 
         Spacer(Modifier.height(24.dp))
@@ -118,9 +119,7 @@ private fun Syncing(state: DeviceSyncState.Syncing) {
 
         Spacer(Modifier.height(24.dp))
 
-        val context = LocalContext.current
         var lastUpdate by remember { mutableStateOf<String?>(null) }
-
         LaunchedEffect(state.lastSyncTime) {
             while (true) {
                 lastUpdate = formatElapsedTimeSince(state.lastSyncTime)
@@ -137,27 +136,48 @@ private fun Syncing(state: DeviceSyncState.Syncing) {
 
         Spacer(Modifier.height(8.dp))
 
-        val location = remember(state.lastLocation) {
-            if (state.lastLocation != null) {
-                buildString {
-                    append(state.lastLocation.latitude.toString(decimals = 4))
-                    append(", ")
-                    append(state.lastLocation.longitude.toString(decimals = 4))
-                }
-            } else null
-        }
+        val location =
+            remember(state.lastLocation) {
+                if (state.lastLocation != null) {
+                    buildString {
+                        append(state.lastLocation.latitude.toString(decimals = 4))
+                        append(", ")
+                        append(state.lastLocation.longitude.toString(decimals = 4))
+                    }
+                } else null
+            }
 
         if (location != null) {
-            Text(
-                "Last location: $location",
-                style = MaterialTheme.typography.labelSmall,
-            )
+            Text("Last location: $location", style = MaterialTheme.typography.labelSmall)
         }
     }
 }
 
 private fun Double.toString(decimals: Int): String =
-    String.format(Locale.getDefault(), "%.4f", this)
+    String.format(Locale.getDefault(), "%.${decimals}f", this)
 
+@OptIn(ExperimentalApi::class)
+@Composable
+private fun Reconnecting(state: DeviceSyncState.Disconnected) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        CircularProgressIndicator()
 
+        Spacer(Modifier.height(8.dp))
 
+        val name =
+            remember(state.peripheral) { state.peripheral.name ?: state.peripheral.identifier }
+
+        Text("Reconnecting to $name...")
+    }
+}
+
+@Composable
+private fun Stopped(onReconnectClick: () -> Unit) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text("Disconnected by user", style = MaterialTheme.typography.bodyLarge)
+
+        Spacer(Modifier.height(16.dp))
+
+        Button(onClick = onReconnectClick) { Text("Reconnect") }
+    }
+}

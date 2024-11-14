@@ -53,12 +53,22 @@ class MainViewModel(private val dataStore: DataStore<SelectedDevices>) : ViewMod
         } else {
             _mainState.value = MainState.NoDeviceSelected
         }
+
+    fun onDeviceDisconnected() {
+        viewModelScope.launch { updateMainState(dataStore.data.first().selectedDevice) }
+    }
+
+    fun reconnect() {
+        onDeviceDisconnected()
+    }
 }
 
 sealed interface MainState {
     data object NeedsPermissions : MainState
 
     data object NoDeviceSelected : MainState
+
+    data object Stopped : MainState
 
     data class FindingDevice(val selectedDevice: SelectedDevice) : MainState
 

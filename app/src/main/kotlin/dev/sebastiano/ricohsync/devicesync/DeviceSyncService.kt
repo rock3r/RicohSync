@@ -4,6 +4,7 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.app.ForegroundServiceStartNotAllowedException
 import android.app.Service
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
@@ -24,15 +25,16 @@ import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import com.google.protobuf.kotlin.toByteString
 import com.juul.kable.Advertisement
+import com.juul.kable.ExperimentalApi
 import com.juul.kable.Peripheral
 import com.juul.kable.WriteType
 import com.juul.kable.logs.Logging
 import com.juul.kable.logs.SystemLogEngine
-import com.juul.kable.peripheral
 import java.nio.ByteOrder
 import java.time.Instant
 import java.time.ZoneId
 import java.time.ZonedDateTime
+import java.util.concurrent.CancellationException
 import java.util.concurrent.TimeUnit
 import kotlin.coroutines.CoroutineContext
 import kotlinx.coroutines.CoroutineName
@@ -48,6 +50,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.shareIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.io.IOException
 import okio.Buffer
 
 internal class DeviceSyncService : Service(), CoroutineScope {
@@ -69,6 +72,9 @@ internal class DeviceSyncService : Service(), CoroutineScope {
                             currentState.lastSyncTime,
                             currentState.lastLocation,
                         )
+
+                    is State.Disconnected -> DeviceSyncState.Disconnected(currentState.peripheral)
+                    is State.Stopped -> DeviceSyncState.Stopped
                 }
             }
             .shareIn(this, SharingStarted.WhileSubscribed())
@@ -83,9 +89,18 @@ internal class DeviceSyncService : Service(), CoroutineScope {
         return binder
     }
 
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (!checkPermissions()) return START_NOT_STICKY
-        startForeground()
+    override fun onStartCommand(intent: Intent, flags: Int, startId: Int): Int {
+        if (intent.action == STOP_INTENT_ACTION) {
+            Log.i("RicohSync", "Disconnecting and stopping...")
+            launch {
+                closeConnection()
+                stopSelf()
+            }
+        } else {
+            if (!checkPermissions()) return START_NOT_STICKY
+            startForeground()
+        }
+
         return super.onStartCommand(intent, flags, startId)
     }
 
@@ -98,7 +113,7 @@ internal class DeviceSyncService : Service(), CoroutineScope {
                 /* foregroundServiceType = */
                 // ktfmt
                 ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE or
-                        ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION,
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION,
             )
         } catch (e: Exception) {
             if (e is ForegroundServiceStartNotAllowedException) {
@@ -193,7 +208,7 @@ internal class DeviceSyncService : Service(), CoroutineScope {
     fun connectAndSync(advertisement: Advertisement) {
         syncJob = launch {
             val peripheral =
-                peripheral(advertisement) {
+                Peripheral(advertisement) {
                     logging {
                         level = Logging.Level.Events
                         engine = SystemLogEngine
@@ -202,17 +217,33 @@ internal class DeviceSyncService : Service(), CoroutineScope {
                 }
 
             try {
-                peripheral.connect()
-                setPairedDeviceName(peripheral)
-//                readFirmwareVersion(peripheral)
+                Log.i("RicohSync", "Connecting to ${advertisement.peripheralName}...")
+                peripheral
+                    .connect()
+                    .launch {
+                        Log.i("RicohSync", "Connected to ${advertisement.peripheralName}")
+                        readFirmwareVersion(peripheral)
+                        setPairedDeviceName(peripheral)
 
-                _state.value = State.Syncing(peripheral, null, null)
-                updateNotification()
+                        _state.value = State.Syncing(peripheral, null, null)
+                        updateNotification()
 
-                toggleGeoTagging(peripheral, enabled = true)
-                syncLocationWith(peripheral)
-            } catch (e: Exception) {
+                        toggleGeoTagging(peripheral, enabled = true)
+                        try {
+                            syncLocationWith(peripheral)
+                        } catch (e: CancellationException) {
+                            Log.e("RicohSync", "Syncing cancelled: INNER disconnected/cancelled", e)
+                            if (_state.value != State.Stopped) {
+                                _state.value = State.Disconnected(peripheral)
+                                updateNotification()
+                            }
+                        }
+                    }
+                    .join()
+            } catch (e: IOException) {
                 Log.e("RicohSync", "Error:", e)
+                _state.value = State.Disconnected(peripheral)
+                updateNotification()
             }
         }
         _state.value = State.Connecting(advertisement)
@@ -221,7 +252,7 @@ internal class DeviceSyncService : Service(), CoroutineScope {
 
     private suspend fun setPairedDeviceName(peripheral: Peripheral) {
         val service =
-            peripheral.services.orEmpty().first {
+            peripheral.services.value.orEmpty().first {
                 it.serviceUuid.toString() == "0f291746-0c80-4726-87a7-3c501fd3b4b6"
             }
 
@@ -230,12 +261,13 @@ internal class DeviceSyncService : Service(), CoroutineScope {
                 it.characteristicUuid.toString() == "fe3a32f8-a189-42de-a391-bc81ae4daa76"
             }
 
+        Log.i("RicohSync", "Setting paired device name...")
         peripheral.write(char, "${Build.MODEL} RicohSync".toByteArray())
     }
 
     private suspend fun readFirmwareVersion(peripheral: Peripheral) {
         val service =
-            peripheral.services.orEmpty().first {
+            peripheral.services.value.orEmpty().first {
                 it.serviceUuid.toString() == "9a5ed1c5-74cc-4c50-b5b6-66a48e7ccff1"
             }
 
@@ -245,12 +277,13 @@ internal class DeviceSyncService : Service(), CoroutineScope {
             }
 
         val firmwareVersion = peripheral.read(char)
-        println("Firmware version: ${firmwareVersion.toString(Charsets.UTF_8).trimEnd(Char(0))}")
+        val versionString = firmwareVersion.toString(Charsets.UTF_8).trimEnd(Char(0))
+        Log.i("RicohSync", "Paired device firmware version: $versionString")
     }
 
     private suspend fun toggleGeoTagging(peripheral: Peripheral, enabled: Boolean) {
         val service =
-            peripheral.services.orEmpty().first {
+            peripheral.services.value.orEmpty().first {
                 it.serviceUuid.toString() == "4b445988-caa0-4dd3-941d-37b4f52aca86"
             }
 
@@ -259,21 +292,20 @@ internal class DeviceSyncService : Service(), CoroutineScope {
                 it.characteristicUuid.toString() == "a36afdcf-6b67-4046-9be7-28fb67dbc071"
             }
 
-        Log.i("RicohSync", "Enabling geo-tagging")
-
         val geoTagEnabled = peripheral.read(char).first()
-        Log.i("RicohSync", "Geo-tagging enabled: ${geoTagEnabled == 1.toByte()}")
+        Log.i("RicohSync", "Geo-tagging enabled check: ${geoTagEnabled == 1.toByte()}")
 
+        Log.i("RicohSync", "${if (enabled) "Enabling" else "Disabling"} geo-tagging")
         peripheral.write(
             characteristic = char,
             data = ByteArray(1).also { it[0] = if (enabled) 1 else 0 },
-            writeType = WriteType.WithResponse
+            writeType = WriteType.WithResponse,
         )
     }
 
     private suspend fun syncLocationWith(peripheral: Peripheral) {
         val service =
-            peripheral.services.orEmpty().first {
+            peripheral.services.value.orEmpty().first {
                 it.serviceUuid.toString() == "84a0dd62-e8aa-4d0f-91db-819b6724c69e"
             }
 
@@ -289,9 +321,7 @@ internal class DeviceSyncService : Service(), CoroutineScope {
                 ZonedDateTime.ofInstant(Instant.ofEpochMilli(location.time), ZoneId.of("UTC"))
             val dataToWrite = computeLocationDataBytes(location, dateTime)
 
-            toggleGeoTagging(peripheral, false)
-            toggleGeoTagging(peripheral, true)
-
+            Log.i("RicohSync", "Sending latest GPS location...")
             peripheral.write(char, dataToWrite, WriteType.WithResponse)
 
             _state.update { currentState ->
@@ -302,37 +332,39 @@ internal class DeviceSyncService : Service(), CoroutineScope {
             }
             updateNotification()
         }
-
-        Log.i("RicohSync", "Finished syncing with device")
     }
 
     private fun computeLocationDataBytes(location: Location, dateTime: ZonedDateTime): ByteArray {
-        val buffer = Buffer()
-            .writeLong(location.latitude.toBits())  // 8 bytes (0)
-            .writeLong(location.longitude.toBits()) // 8 bytes (8)
-            .writeLong(location.altitude.toBits())  // 8 bytes (16)
-            .writeShortLe(dateTime.year)            // 2 bytes (24)
-            .writeByte(dateTime.monthValue)         // 1 byte  (26)
-            .writeByte(dateTime.dayOfMonth)         // 1 byte  (27)
-            .writeByte(dateTime.hour)               // 1 byte  (28)
-            .writeByte(dateTime.minute)             // 1 byte  (29)
-            .writeByte(dateTime.second)             // 1 byte  (30)
-            .writeByte(0)                        // 1 byte  (31)
+        val buffer =
+            Buffer()
+                .writeLong(location.latitude.toBits()) // 8 bytes (0)
+                .writeLong(location.longitude.toBits()) // 8 bytes (8)
+                .writeLong(location.altitude.toBits()) // 8 bytes (16)
+                .writeShortLe(dateTime.year) // 2 bytes (24)
+                .writeByte(dateTime.monthValue) // 1 byte  (26)
+                .writeByte(dateTime.dayOfMonth) // 1 byte  (27)
+                .writeByte(dateTime.hour) // 1 byte  (28)
+                .writeByte(dateTime.minute) // 1 byte  (29)
+                .writeByte(dateTime.second) // 1 byte  (30)
+                .writeByte(0) // 1 byte  (31)
 
         return buffer.readByteArray()
     }
 
-    fun disconnect() {
+    @OptIn(ExperimentalApi::class)
+    private suspend fun closeConnection() {
         val currentState = _state.value
         if (syncJob == null || currentState !is State.Syncing) return
+
+        Log.i("RicohSync", "Setting state to stopped")
+        _state.value = State.Stopped
+
+        currentState.peripheral.disconnect()
+        currentState.peripheral.cancel("Disconnecting...")
+        Log.i("RicohSync", "Disconnected from ${currentState.peripheral.name}")
+
         syncJob?.cancel("Disconnecting...")
         syncJob = null
-
-        launch {
-            currentState.peripheral.disconnect()
-            _state.value = State.Idle
-            updateNotification()
-        }
     }
 
     private fun updateNotification() {
@@ -364,12 +396,24 @@ internal class DeviceSyncService : Service(), CoroutineScope {
             val lastSyncTime: ZonedDateTime?,
             val lastLocation: Location?,
         ) : State
+
+        data class Disconnected(val peripheral: Peripheral) : State
+
+        data object Stopped : State
     }
 
     companion object {
         private const val NOTIFICATION_ID = 111
+        const val STOP_REQUEST_CODE = 666
+        const val STOP_INTENT_ACTION = "disconnect_camera"
 
         fun getInstanceFrom(binder: Binder) = (binder as DeviceSyncServiceBinder).getService()
+
+        fun createDisconnectIntent(context: Context) =
+            Intent(context, DeviceSyncService::class.java).apply {
+                action = STOP_INTENT_ACTION
+                flags = Intent.FLAG_ACTIVITY_SINGLE_TOP
+            }
 
         fun asHumanReadableString(bytes: ByteArray): String {
             val buffer = bytes.toByteString().asReadOnlyByteBuffer().order(ByteOrder.BIG_ENDIAN)
@@ -390,27 +434,26 @@ internal class DeviceSyncService : Service(), CoroutineScope {
         }
 
         @OptIn(ExperimentalStdlibApi::class)
-        fun prettyPrint(bytes: ByteArray) =
-            buildString {
-                append(bytes.sliceArray(0..7).toHexString())
-                append("_")
-                append(bytes.sliceArray(8..15).toHexString())
-                append("_")
-                append(bytes.sliceArray(16..23).toHexString())
-                append("_")
-                append(bytes.sliceArray(24..25).toHexString())
-                append("_")
-                append(bytes[26].toHexString())
-                append("_")
-                append(bytes[27].toHexString())
-                append("_")
-                append(bytes[28].toHexString())
-                append("_")
-                append(bytes[29].toHexString())
-                append("_")
-                append(bytes[30].toHexString())
-                append("_")
-                append(bytes[31].toHexString())
-            }
+        fun prettyPrint(bytes: ByteArray) = buildString {
+            append(bytes.sliceArray(0..7).toHexString())
+            append("_")
+            append(bytes.sliceArray(8..15).toHexString())
+            append("_")
+            append(bytes.sliceArray(16..23).toHexString())
+            append("_")
+            append(bytes.sliceArray(24..25).toHexString())
+            append("_")
+            append(bytes[26].toHexString())
+            append("_")
+            append(bytes[27].toHexString())
+            append("_")
+            append(bytes[28].toHexString())
+            append("_")
+            append(bytes[29].toHexString())
+            append("_")
+            append(bytes[30].toHexString())
+            append("_")
+            append(bytes[31].toHexString())
+        }
     }
 }

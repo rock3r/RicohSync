@@ -3,12 +3,14 @@ package dev.sebastiano.ricohsync.devicesync
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.Context
 import android.text.format.DateUtils
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationCompat.PRIORITY_HIGH
 import androidx.core.app.NotificationCompat.PRIORITY_LOW
 import com.juul.kable.Advertisement
+import com.juul.kable.ExperimentalApi
 import com.juul.kable.Peripheral
 import dev.sebastiano.ricohsync.R
 import java.text.DateFormat
@@ -18,20 +20,19 @@ internal const val NOTIFICATION_CHANNEL = "SYNC_SERVICE_NOTIFICATION_CHANNEL"
 
 internal fun createForegroundServiceNotification(
     context: Context,
-    state: DeviceSyncService.State
+    state: DeviceSyncService.State,
 ): Notification =
     when (state) {
-        is DeviceSyncService.State.Connecting -> createConnectingNotification(
-            context,
-            state.advertisement
-        )
+        is DeviceSyncService.State.Connecting ->
+            createConnectingNotification(context, state.advertisement)
+        is DeviceSyncService.State.Disconnected ->
+            createReconnectingNotification(context, state.peripheral)
 
         DeviceSyncService.State.Idle -> createIdleNotification(context)
-        is DeviceSyncService.State.Syncing -> createSyncingNotification(
-            context,
-            state.peripheral,
-            state.lastSyncTime
-        )
+        is DeviceSyncService.State.Syncing ->
+            createSyncingNotification(context, state.peripheral, state.lastSyncTime)
+
+        DeviceSyncService.State.Stopped -> error("No notification when stopped")
     }
 
 private fun createConnectingNotification(context: Context, advertisement: Advertisement) =
@@ -45,6 +46,17 @@ private fun createConnectingNotification(context: Context, advertisement: Advert
         .setSmallIcon(R.drawable.ic_sync_disabled)
         .build()
 
+@OptIn(ExperimentalApi::class)
+private fun createReconnectingNotification(context: Context, peripheral: Peripheral) =
+    NotificationCompat.Builder(context, NOTIFICATION_CHANNEL)
+        .setOngoing(true)
+        .setPriority(PRIORITY_LOW)
+        .setCategory(Notification.CATEGORY_SERVICE)
+        .setSilent(true)
+        .setContentTitle("Reconnecting to ${peripheral.name}...")
+        .setContentText("Connection to the device lost")
+        .setSmallIcon(R.drawable.ic_sync_error)
+        .build()
 
 private fun createIdleNotification(context: Context): Notification =
     NotificationCompat.Builder(context, NOTIFICATION_CHANNEL)
@@ -57,10 +69,11 @@ private fun createIdleNotification(context: Context): Notification =
         .setSmallIcon(R.drawable.ic_sync_disabled)
         .build()
 
+@OptIn(ExperimentalApi::class)
 private fun createSyncingNotification(
     context: Context,
     peripheral: Peripheral,
-    lastSyncTime: ZonedDateTime?
+    lastSyncTime: ZonedDateTime?,
 ): Notification =
     NotificationCompat.Builder(context, NOTIFICATION_CHANNEL)
         .setOngoing(true)
@@ -70,6 +83,19 @@ private fun createSyncingNotification(
         .setContentTitle("Syncing with ${peripheral.name}")
         .setContentText("Last update: ${formatElapsedTimeSince(lastSyncTime)}")
         .setSmallIcon(R.drawable.ic_sync)
+        .addAction(
+            NotificationCompat.Action.Builder(
+                    /* icon = */ 0,
+                    /* title = */ "Disconnect",
+                    /* intent = */ PendingIntent.getService(
+                        context,
+                        DeviceSyncService.STOP_REQUEST_CODE,
+                        DeviceSyncService.createDisconnectIntent(context),
+                        PendingIntent.FLAG_IMMUTABLE,
+                    ),
+                )
+                .build()
+        )
         .build()
 
 internal fun formatElapsedTimeSince(lastSyncTime: ZonedDateTime?): String {
@@ -79,11 +105,12 @@ internal fun formatElapsedTimeSince(lastSyncTime: ZonedDateTime?): String {
     if (now - syncTime < 5 * DateUtils.SECOND_IN_MILLIS) return "just now"
 
     return DateUtils.formatSameDayTime(
-        /* then = */ syncTime,
-        /* now = */ now,
-        /* dateStyle = */ DateFormat.SHORT,
-        /* timeStyle = */ DateFormat.SHORT,
-    ).toString()
+            /* then = */ syncTime,
+            /* now = */ now,
+            /* dateStyle = */ DateFormat.SHORT,
+            /* timeStyle = */ DateFormat.SHORT,
+        )
+        .toString()
 }
 
 fun createErrorNotificationBuilder(context: Context): NotificationCompat.Builder =

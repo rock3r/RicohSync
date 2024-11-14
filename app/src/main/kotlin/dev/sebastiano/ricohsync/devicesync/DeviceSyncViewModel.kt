@@ -25,7 +25,8 @@ import kotlinx.coroutines.launch
 
 internal class DeviceSyncViewModel(
     private val advertisement: Advertisement,
-    bindingContextProvider: () -> Context,
+    private val onDeviceDisconnected: (Peripheral) -> Unit,
+    private val bindingContextProvider: () -> Context,
 ) : ViewModel() {
     private val _state = mutableStateOf<DeviceSyncState>(DeviceSyncState.Starting)
     val state: State<DeviceSyncState> = _state
@@ -34,11 +35,15 @@ internal class DeviceSyncViewModel(
     private var collectJob: Job? = null
 
     init {
-        startAndBindService(bindingContextProvider)
+        connectAndSync()
         serviceBinder
             .onEach { binder -> if (binder != null) onBound(binder) else onUnbound() }
             .flowOn(Dispatchers.Default)
             .launchIn(viewModelScope)
+    }
+
+    fun connectAndSync() {
+        startAndBindService(bindingContextProvider)
     }
 
     private fun startAndBindService(bindingContextProvider: () -> Context) {
@@ -67,7 +72,10 @@ internal class DeviceSyncViewModel(
                 try {
                     val service = DeviceSyncService.getInstanceFrom(binder)
                     service.connectAndSync(advertisement)
-                    service.state.collect { _state.value = it }
+                    service.state.collect {
+                        _state.value = it
+                        if (it is DeviceSyncState.Disconnected) onDeviceDisconnected(it.peripheral)
+                    }
                 } catch (e: DeadObjectException) {
                     onUnbound()
                 }
@@ -77,6 +85,7 @@ internal class DeviceSyncViewModel(
     private fun onUnbound() {
         collectJob?.cancel("Service connection died")
         collectJob = null
+        _state.value = DeviceSyncState.Stopped
     }
 }
 
@@ -86,9 +95,13 @@ internal sealed interface DeviceSyncState {
 
     data class Connecting(val advertisement: Advertisement) : DeviceSyncState
 
+    data class Disconnected(val peripheral: Peripheral) : DeviceSyncState
+
     data class Syncing(
         val peripheral: Peripheral,
         val lastSyncTime: ZonedDateTime?,
         val lastLocation: Location?,
     ) : DeviceSyncState
+
+    data object Stopped : DeviceSyncState
 }

@@ -14,6 +14,7 @@ import com.juul.kable.PlatformAdvertisement
 import com.juul.kable.Scanner
 import com.juul.kable.logs.Logging
 import com.juul.kable.logs.SystemLogEngine
+import java.util.UUID
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
@@ -22,7 +23,6 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.onStart
-import java.util.UUID
 
 internal class ScanningViewModel : ViewModel() {
     private val _state = mutableStateOf<PairingState>(PairingState.Loading)
@@ -33,9 +33,7 @@ internal class ScanningViewModel : ViewModel() {
     @OptIn(ObsoleteKableApi::class)
     private val scanner = Scanner {
         filters {
-            match {
-                services = listOf(UUID.fromString("84A0DD62-E8AA-4D0F-91DB-819B6724C69E"))
-            }
+            match { services = listOf(UUID.fromString("84A0DD62-E8AA-4D0F-91DB-819B6724C69E")) }
         }
 
         logging {

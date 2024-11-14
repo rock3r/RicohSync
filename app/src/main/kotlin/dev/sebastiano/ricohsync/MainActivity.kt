@@ -48,6 +48,8 @@ private fun RootComposable(mainViewModel: MainViewModel, context: Context) {
         when (val currentState = state) {
             MainState.NeedsPermissions -> PermissionsScreen(mainViewModel)
 
+            MainState.Stopped -> StoppedScreen { mainViewModel.reconnect() }
+
             MainState.NoDeviceSelected -> {
                 val scanningViewModel = remember { ScanningViewModel() }
                 ScanningScreen(scanningViewModel) {
@@ -64,6 +66,7 @@ private fun RootComposable(mainViewModel: MainViewModel, context: Context) {
                 val deviceSyncViewModel = remember {
                     DeviceSyncViewModel(
                         advertisement = currentState.advertisement,
+                        onDeviceDisconnected = { mainViewModel.onDeviceDisconnected() },
                         bindingContextProvider = { context.applicationContext },
                     )
                 }
@@ -79,12 +82,7 @@ private fun PermissionsScreen(mainViewModel: MainViewModel) {
     PermissionsRequester(mainViewModel::onPermissionsGranted) { _, _, _, _, request ->
         // TODO explain missing permissions
         Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding),
-                contentAlignment = Alignment.Center,
-            ) {
+            Box(Modifier.fillMaxSize().padding(innerPadding), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text("Please grant permissions")
                     Spacer(Modifier.height(8.dp))
@@ -96,14 +94,22 @@ private fun PermissionsScreen(mainViewModel: MainViewModel) {
 }
 
 @Composable
+private fun StoppedScreen(onReconnect: () -> Unit) {
+    Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
+        Box(Modifier.fillMaxSize().padding(innerPadding), contentAlignment = Alignment.Center) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("Stopped by user")
+                Spacer(Modifier.height(8.dp))
+                Button(onReconnect) { Text("Reconnect") }
+            }
+        }
+    }
+}
+
+@Composable
 private fun SearchingDevice(currentState: MainState.FindingDevice) {
     Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-        Box(
-            Modifier
-                .fillMaxSize()
-                .padding(innerPadding),
-            contentAlignment = Alignment.Center,
-        ) {
+        Box(Modifier.fillMaxSize().padding(innerPadding), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
                     "Looking for ${currentState.selectedDevice.name}...",
