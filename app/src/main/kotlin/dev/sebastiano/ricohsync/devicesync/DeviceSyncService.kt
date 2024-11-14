@@ -22,18 +22,17 @@ import com.google.android.gms.location.LocationRequest
 import com.google.android.gms.location.LocationResult
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
+import com.google.protobuf.kotlin.toByteString
 import com.juul.kable.Advertisement
 import com.juul.kable.Peripheral
 import com.juul.kable.WriteType
-import com.juul.kable.characteristicOf
 import com.juul.kable.logs.Logging
 import com.juul.kable.logs.SystemLogEngine
 import com.juul.kable.peripheral
-import java.nio.ByteBuffer
 import java.nio.ByteOrder
-import java.time.ZoneOffset
+import java.time.Instant
+import java.time.ZoneId
 import java.time.ZonedDateTime
-import java.time.format.DateTimeFormatter
 import java.util.concurrent.TimeUnit
 import kotlin.coroutines.CoroutineContext
 import kotlinx.coroutines.CoroutineName
@@ -49,6 +48,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.shareIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import okio.Buffer
 
 internal class DeviceSyncService : Service(), CoroutineScope {
     override val coroutineContext: CoroutineContext =
@@ -93,12 +93,12 @@ internal class DeviceSyncService : Service(), CoroutineScope {
         try {
             ServiceCompat.startForeground(
                 /* service = */ this,
-                /* id = */ 100, // Cannot be 0
-                /* notification = */ createForegroundServiceNotification(this),
+                /* id = */ NOTIFICATION_ID, // Cannot be 0
+                /* notification = */ createForegroundServiceNotification(this, _state.value),
                 /* foregroundServiceType = */
                 // ktfmt
                 ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE or
-                    ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION,
+                        ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION,
             )
         } catch (e: Exception) {
             if (e is ForegroundServiceStartNotAllowedException) {
@@ -170,7 +170,7 @@ internal class DeviceSyncService : Service(), CoroutineScope {
 
         val locationClient = LocationServices.getFusedLocationProviderClient(this)
         val request =
-            LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, TimeUnit.SECONDS.toMillis(30))
+            LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, TimeUnit.SECONDS.toMillis(10))
                 .setMinUpdateDistanceMeters(5f)
                 .build()
 
@@ -204,15 +204,19 @@ internal class DeviceSyncService : Service(), CoroutineScope {
             try {
                 peripheral.connect()
                 setPairedDeviceName(peripheral)
-                readFirmwareVersion(peripheral)
+//                readFirmwareVersion(peripheral)
 
                 _state.value = State.Syncing(peripheral, null, null)
-                syncLocationAndTimeWith(peripheral)
+                updateNotification()
+
+                toggleGeoTagging(peripheral, enabled = true)
+                syncLocationWith(peripheral)
             } catch (e: Exception) {
-                Log.e("Ricooola", "Error:", e)
+                Log.e("RicohSync", "Error:", e)
             }
         }
         _state.value = State.Connecting(advertisement)
+        updateNotification()
     }
 
     private suspend fun setPairedDeviceName(peripheral: Peripheral) {
@@ -244,59 +248,78 @@ internal class DeviceSyncService : Service(), CoroutineScope {
         println("Firmware version: ${firmwareVersion.toString(Charsets.UTF_8).trimEnd(Char(0))}")
     }
 
-    private suspend fun syncLocationAndTimeWith(peripheral: Peripheral) {
+    private suspend fun toggleGeoTagging(peripheral: Peripheral, enabled: Boolean) {
+        val service =
+            peripheral.services.orEmpty().first {
+                it.serviceUuid.toString() == "4b445988-caa0-4dd3-941d-37b4f52aca86"
+            }
+
+        val char =
+            service.characteristics.first {
+                it.characteristicUuid.toString() == "a36afdcf-6b67-4046-9be7-28fb67dbc071"
+            }
+
+        Log.i("RicohSync", "Enabling geo-tagging")
+
+        val geoTagEnabled = peripheral.read(char).first()
+        Log.i("RicohSync", "Geo-tagging enabled: ${geoTagEnabled == 1.toByte()}")
+
+        peripheral.write(
+            characteristic = char,
+            data = ByteArray(1).also { it[0] = if (enabled) 1 else 0 },
+            writeType = WriteType.WithResponse
+        )
+    }
+
+    private suspend fun syncLocationWith(peripheral: Peripheral) {
+        val service =
+            peripheral.services.orEmpty().first {
+                it.serviceUuid.toString() == "84a0dd62-e8aa-4d0f-91db-819b6724c69e"
+            }
+
+        val char =
+            service.characteristics.first {
+                it.characteristicUuid.toString() == "28f59d60-8b8e-4fcd-a81f-61bdb46595a9"
+            }
+
         lastLocation.collect { location ->
             if (location == null) return@collect
 
-            val dateTime = ZonedDateTime.now()
-            val dataToWrite = computeSyncDataBytes(location, dateTime)
-            peripheral.write(SyncServiceCharacteristic, dataToWrite, WriteType.WithResponse)
+            val dateTime =
+                ZonedDateTime.ofInstant(Instant.ofEpochMilli(location.time), ZoneId.of("UTC"))
+            val dataToWrite = computeLocationDataBytes(location, dateTime)
+
+            toggleGeoTagging(peripheral, false)
+            toggleGeoTagging(peripheral, true)
+
+            peripheral.write(char, dataToWrite, WriteType.WithResponse)
+
             _state.update { currentState ->
                 val syncingState =
                     currentState as? State.Syncing ?: State.Syncing(peripheral, dateTime, location)
 
-                syncingState.copy(lastSyncTime = dateTime, lastLocation = location)
+                syncingState.copy(lastSyncTime = ZonedDateTime.now(), lastLocation = location)
             }
+            updateNotification()
         }
+
+        Log.i("RicohSync", "Finished syncing with device")
     }
 
-    @OptIn(ExperimentalStdlibApi::class)
-    private fun computeSyncDataBytes(location: Location, dateTime: ZonedDateTime): ByteArray {
-        val buffer =
-            ByteBuffer.allocate(80).order(ByteOrder.LITTLE_ENDIAN) // Assuming little-endianness
+    private fun computeLocationDataBytes(location: Location, dateTime: ZonedDateTime): ByteArray {
+        val buffer = Buffer()
+            .writeLong(location.latitude.toBits())  // 8 bytes (0)
+            .writeLong(location.longitude.toBits()) // 8 bytes (8)
+            .writeLong(location.altitude.toBits())  // 8 bytes (16)
+            .writeShortLe(dateTime.year)            // 2 bytes (24)
+            .writeByte(dateTime.monthValue)         // 1 byte  (26)
+            .writeByte(dateTime.dayOfMonth)         // 1 byte  (27)
+            .writeByte(dateTime.hour)               // 1 byte  (28)
+            .writeByte(dateTime.minute)             // 1 byte  (29)
+            .writeByte(dateTime.second)             // 1 byte  (30)
+            .writeByte(0)                        // 1 byte  (31)
 
-        // Latitude and Longitude (Float64, 8 bytes each)
-        buffer.putFloat(location.latitude.toFloat())
-        buffer.putFloat(location.longitude.toFloat())
-
-        // Altitude (Float64, 8 bytes) with range check
-        buffer.putFloat(location.altitude.coerceIn(-9999.0, 9999.0).toFloat())
-
-        // Year (Short, 2 bytes)
-        buffer.putShort(dateTime.year.toShort())
-
-        // Month, Day, Hours, Minutes, Seconds (Byte, 1 byte each)
-        buffer.put(dateTime.monthValue.toByte())
-        buffer.put(dateTime.dayOfMonth.toByte())
-        buffer.put(dateTime.hour.toByte())
-        buffer.put(dateTime.minute.toByte())
-        buffer.put(dateTime.second.toByte())
-
-        // Time Zone (String, 6 bytes + null terminator)
-        val timeZone = formatZoneOffset(dateTime.offset)
-        buffer.put(timeZone.toByteArray(Charsets.UTF_8))
-
-        // Datum (Byte, 1 byte)
-        buffer.put(0.toByte()) // Assuming WGS84
-
-        Log.i("RicohSync", "Computed data (${buffer.array().size} bytes): ${buffer.array()}")
-
-        return buffer.array()
-    }
-
-    private fun formatZoneOffset(offset: ZoneOffset): String {
-        val formatter = DateTimeFormatter.ofPattern("xxx") // "xxx" pattern for ZoneOffset
-        return formatter.format(offset)
+        return buffer.readByteArray()
     }
 
     fun disconnect() {
@@ -308,7 +331,13 @@ internal class DeviceSyncService : Service(), CoroutineScope {
         launch {
             currentState.peripheral.disconnect()
             _state.value = State.Idle
+            updateNotification()
         }
+    }
+
+    private fun updateNotification() {
+        val notification = createForegroundServiceNotification(this, _state.value)
+        startForeground(NOTIFICATION_ID, notification)
     }
 
     override fun onUnbind(intent: Intent?): Boolean {
@@ -325,7 +354,7 @@ internal class DeviceSyncService : Service(), CoroutineScope {
         fun getService() = this@DeviceSyncService
     }
 
-    private sealed interface State {
+    internal sealed interface State {
         data object Idle : State
 
         data class Connecting(val advertisement: Advertisement) : State
@@ -338,12 +367,50 @@ internal class DeviceSyncService : Service(), CoroutineScope {
     }
 
     companion object {
+        private const val NOTIFICATION_ID = 111
+
         fun getInstanceFrom(binder: Binder) = (binder as DeviceSyncServiceBinder).getService()
 
-        private val SyncServiceCharacteristic =
-            characteristicOf(
-                "84A0DD62-E8AA-4D0F-91DB-819B6724C69E",
-                "28F59D60-8B8E-4FCD-A81F-61BDB46595A9",
-            )
+        fun asHumanReadableString(bytes: ByteArray): String {
+            val buffer = bytes.toByteString().asReadOnlyByteBuffer().order(ByteOrder.BIG_ENDIAN)
+
+            val lat = Double.fromBits(buffer.getLong())
+            val lon = Double.fromBits(buffer.getLong())
+            val alt = Double.fromBits(buffer.getLong())
+            buffer.order(ByteOrder.LITTLE_ENDIAN)
+            val year = buffer.getShort().toString().padStart(4, '0')
+            buffer.order(ByteOrder.BIG_ENDIAN)
+            val month = buffer.get().toString().padStart(2, '0')
+            val day = buffer.get().toString().padStart(2, '0')
+            val hour = buffer.get().toString().padStart(2, '0')
+            val minute = buffer.get().toString().padStart(2, '0')
+            val second = buffer.get().toString().padStart(2, '0')
+
+            return "BLE Location data: ($lat, $lon), altitude: $alt. Time: $year-$month-$day $hour:$minute:$second"
+        }
+
+        @OptIn(ExperimentalStdlibApi::class)
+        fun prettyPrint(bytes: ByteArray) =
+            buildString {
+                append(bytes.sliceArray(0..7).toHexString())
+                append("_")
+                append(bytes.sliceArray(8..15).toHexString())
+                append("_")
+                append(bytes.sliceArray(16..23).toHexString())
+                append("_")
+                append(bytes.sliceArray(24..25).toHexString())
+                append("_")
+                append(bytes[26].toHexString())
+                append("_")
+                append(bytes[27].toHexString())
+                append("_")
+                append(bytes[28].toHexString())
+                append("_")
+                append(bytes[29].toHexString())
+                append("_")
+                append(bytes[30].toHexString())
+                append("_")
+                append(bytes[31].toHexString())
+            }
     }
 }

@@ -46,22 +46,7 @@ private fun RootComposable(mainViewModel: MainViewModel, context: Context) {
     RicohSyncTheme {
         val state by mainViewModel.mainState
         when (val currentState = state) {
-            MainState.NeedsPermissions ->
-                PermissionsRequester(mainViewModel::onPermissionsGranted) { _, _, _, _, request ->
-                    // TODO explain missing permissions
-                    Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                        Box(
-                            Modifier.fillMaxSize().padding(innerPadding),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text("Please grant permissions")
-                                Spacer(Modifier.height(8.dp))
-                                Button(request) { Text("Grant now") }
-                            }
-                        }
-                    }
-                }
+            MainState.NeedsPermissions -> PermissionsScreen(mainViewModel)
 
             MainState.NoDeviceSelected -> {
                 val scanningViewModel = remember { ScanningViewModel() }
@@ -73,23 +58,7 @@ private fun RootComposable(mainViewModel: MainViewModel, context: Context) {
                 }
             }
 
-            is MainState.FindingDevice -> {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    Box(
-                        Modifier.fillMaxSize().padding(innerPadding),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("Connecting to ${currentState.selectedDevice.name}...")
-                            Spacer(Modifier.height(8.dp))
-                            Text(
-                                currentState.selectedDevice.macAddress,
-                                style = MaterialTheme.typography.titleLarge,
-                            )
-                        }
-                    }
-                }
-            }
+            is MainState.FindingDevice -> SearchingDevice(currentState)
 
             is MainState.DeviceFound -> {
                 val deviceSyncViewModel = remember {
@@ -100,6 +69,53 @@ private fun RootComposable(mainViewModel: MainViewModel, context: Context) {
                 }
 
                 DeviceSyncScreen(deviceSyncViewModel)
+            }
+        }
+    }
+}
+
+@Composable
+private fun PermissionsScreen(mainViewModel: MainViewModel) {
+    PermissionsRequester(mainViewModel::onPermissionsGranted) { _, _, _, _, request ->
+        // TODO explain missing permissions
+        Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding),
+                contentAlignment = Alignment.Center,
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("Please grant permissions")
+                    Spacer(Modifier.height(8.dp))
+                    Button(request) { Text("Grant now") }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SearchingDevice(currentState: MainState.FindingDevice) {
+    Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
+        Box(
+            Modifier
+                .fillMaxSize()
+                .padding(innerPadding),
+            contentAlignment = Alignment.Center,
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    "Looking for ${currentState.selectedDevice.name}...",
+                    style = MaterialTheme.typography.titleLarge,
+                )
+
+                Spacer(Modifier.height(8.dp))
+
+                Text(
+                    currentState.selectedDevice.macAddress,
+                    style = MaterialTheme.typography.bodySmall,
+                )
             }
         }
     }
