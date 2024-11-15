@@ -189,7 +189,7 @@ internal class DeviceSyncService : Service(), CoroutineScope {
 
         val locationClient = LocationServices.getFusedLocationProviderClient(this)
         val request =
-            LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, TimeUnit.SECONDS.toMillis(10))
+            LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, TimeUnit.SECONDS.toMillis(30))
                 .setMinUpdateDistanceMeters(5f)
                 .build()
 
