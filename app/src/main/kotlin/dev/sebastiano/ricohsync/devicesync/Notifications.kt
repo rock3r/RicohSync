@@ -30,7 +30,7 @@ internal fun createForegroundServiceNotification(
 
         DeviceSyncService.State.Idle -> createIdleNotification(context)
         is DeviceSyncService.State.Syncing ->
-            createSyncingNotification(context, state.peripheral, state.lastSyncTime)
+            createSyncingNotification(context, state.peripheral, state.locationSyncInfo?.dateTime)
 
         DeviceSyncService.State.Stopped -> error("No notification when stopped")
     }

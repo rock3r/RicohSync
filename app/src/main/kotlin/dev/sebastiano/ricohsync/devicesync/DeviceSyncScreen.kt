@@ -117,32 +117,38 @@ private fun Syncing(state: DeviceSyncState.Syncing) {
             remember(state.peripheral) { state.peripheral.name ?: state.peripheral.identifier }
         Text("Syncing data to $name...", style = MaterialTheme.typography.bodyLarge)
 
+        if (state.firmwareVersion != null) {
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "Firmware version: ${state.firmwareVersion}",
+                style = MaterialTheme.typography.labelSmall,
+            )
+        }
+
         Spacer(Modifier.height(24.dp))
 
         var lastUpdate by remember { mutableStateOf<String?>(null) }
-        LaunchedEffect(state.lastSyncTime) {
+        LaunchedEffect(state.syncInfo) {
             while (true) {
-                lastUpdate = formatElapsedTimeSince(state.lastSyncTime)
+                lastUpdate = formatElapsedTimeSince(state.syncInfo?.dateTime)
                 delay(1.seconds)
             }
         }
 
         if (!lastUpdate.isNullOrEmpty()) {
-            Text(
-                "Last sync time: ${formatElapsedTimeSince(state.lastSyncTime)}",
-                style = MaterialTheme.typography.labelSmall,
-            )
+            Text("Last sync time: $lastUpdate", style = MaterialTheme.typography.labelSmall)
         }
 
         Spacer(Modifier.height(8.dp))
 
         val location =
-            remember(state.lastLocation) {
-                if (state.lastLocation != null) {
+            remember(state.syncInfo) {
+                val location = state.syncInfo?.location
+                if (location != null) {
                     buildString {
-                        append(state.lastLocation.latitude.toString(decimals = 4))
+                        append(location.latitude.toString(decimals = 6))
                         append(", ")
-                        append(state.lastLocation.longitude.toString(decimals = 4))
+                        append(location.longitude.toString(decimals = 6))
                     }
                 } else null
             }

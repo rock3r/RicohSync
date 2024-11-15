@@ -4,7 +4,6 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
-import android.location.Location
 import android.os.DeadObjectException
 import android.os.IBinder
 import androidx.compose.runtime.State
@@ -13,7 +12,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.juul.kable.Advertisement
 import com.juul.kable.Peripheral
-import java.time.ZonedDateTime
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
@@ -99,8 +97,8 @@ internal sealed interface DeviceSyncState {
 
     data class Syncing(
         val peripheral: Peripheral,
-        val lastSyncTime: ZonedDateTime?,
-        val lastLocation: Location?,
+        val firmwareVersion: String?,
+        val syncInfo: LocationSyncInfo?,
     ) : DeviceSyncState
 
     data object Stopped : DeviceSyncState
