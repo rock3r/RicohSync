@@ -15,16 +15,14 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "1.0"
-
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
+                "proguard-rules.pro",
             )
         }
     }
@@ -32,12 +30,8 @@ android {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
-    kotlinOptions {
-        jvmTarget = "11"
-    }
-    buildFeatures {
-        compose = true
-    }
+    kotlinOptions { jvmTarget = "11" }
+    buildFeatures { compose = true }
 }
 
 dependencies {
@@ -69,19 +63,13 @@ dependencies {
 
 // Setup protobuf configuration, generating lite Java and Kotlin classes
 protobuf {
-    protoc {
-        artifact = libs.protobuf.protoc.get().toString()
-    }
+    protoc { artifact = libs.protobuf.protoc.get().toString() }
 
     generateProtoTasks {
         all().forEach { task ->
             task.builtins {
-                register("java") {
-                    option("lite")
-                }
-                register("kotlin") {
-                    option("lite")
-                }
+                register("java") { option("lite") }
+                register("kotlin") { option("lite") }
             }
         }
     }
