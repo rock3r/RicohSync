@@ -93,8 +93,7 @@ internal class DeviceSyncService : Service(), CoroutineScope {
         if (intent.action == STOP_INTENT_ACTION) {
             Log.i("RicohSync", "Disconnecting and stopping...")
             launch {
-                closeConnection()
-                stopSelf()
+                stopAndDisconnect()
             }
         } else {
             if (!checkPermissions()) return START_NOT_STICKY
@@ -102,6 +101,11 @@ internal class DeviceSyncService : Service(), CoroutineScope {
         }
 
         return super.onStartCommand(intent, flags, startId)
+    }
+
+    suspend fun stopAndDisconnect() {
+        closeConnection()
+        stopSelf()
     }
 
     private fun startForeground() {
@@ -127,35 +131,35 @@ internal class DeviceSyncService : Service(), CoroutineScope {
             PermissionChecker.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
 
         if (locationPermission != PermissionChecker.PERMISSION_GRANTED) {
-            stopAndNotify(Manifest.permission.ACCESS_FINE_LOCATION)
+            stopAndNotifyMissingPermission(Manifest.permission.ACCESS_FINE_LOCATION)
             return false
         }
 
         val bluetoothScanPermission =
             PermissionChecker.checkSelfPermission(this, Manifest.permission.BLUETOOTH_SCAN)
         if (bluetoothScanPermission != PermissionChecker.PERMISSION_GRANTED) {
-            stopAndNotify(Manifest.permission.BLUETOOTH_SCAN)
+            stopAndNotifyMissingPermission(Manifest.permission.BLUETOOTH_SCAN)
             return false
         }
 
         val bluetoothConnectPermission =
             PermissionChecker.checkSelfPermission(this, Manifest.permission.BLUETOOTH_CONNECT)
         if (bluetoothConnectPermission != PermissionChecker.PERMISSION_GRANTED) {
-            stopAndNotify(Manifest.permission.BLUETOOTH_CONNECT)
+            stopAndNotifyMissingPermission(Manifest.permission.BLUETOOTH_CONNECT)
             return false
         }
 
         val notificationsPermission =
             PermissionChecker.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
         if (notificationsPermission != PermissionChecker.PERMISSION_GRANTED) {
-            stopAndNotify(Manifest.permission.POST_NOTIFICATIONS)
+            stopAndNotifyMissingPermission(Manifest.permission.POST_NOTIFICATIONS)
             return false
         }
 
         return true
     }
 
-    private fun stopAndNotify(missingPermission: String) {
+    private fun stopAndNotifyMissingPermission(missingPermission: String) {
         stopSelf()
 
         val notification =

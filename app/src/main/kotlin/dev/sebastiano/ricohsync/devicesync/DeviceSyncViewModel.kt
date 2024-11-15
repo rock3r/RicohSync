@@ -80,6 +80,12 @@ internal class DeviceSyncViewModel(
             }
     }
 
+    fun stopSyncAndDisconnect() {
+        viewModelScope.launch {
+            serviceBinder.value?.getService()?.stopAndDisconnect()
+        }
+    }
+
     private fun onUnbound() {
         collectJob?.cancel("Service connection died")
         collectJob = null
