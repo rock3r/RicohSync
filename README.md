@@ -1,20 +1,101 @@
-## RicohSync
+# RicohSync
 
-A simple app that syncs the GPS data and date/time from your Android phone to your Ricoh camera.
+A simple Android application that synchronizes GPS data and date/time from your Android phone to your Ricoh camera via Bluetooth Low Energy (BLE).
 
-This app will let you pick your Camera from visible nearby BLE devices on first start. When the
-camera is turned on and/or its Bluetooth connection is turned on, the app will just reconnect
-automatically and start syncing, unless you close it.
+The app allows you to select your camera from nearby BLE devices on the first start. Once paired, it automatically reconnects and maintains synchronization in the background whenever the camera's Bluetooth is active.
 
-Note that the app MUST be in the foreground while it's connecting to the camera, but it can be left
-in the background after that. You may or may not need/want to exclude it from battery optimisations
-and permissions removal.
+## Features
+
+- **Automatic Synchronization**: Real-time GPS location and date/time sync.
+- **Auto-reconnection**: Automatically reconnects to paired cameras when they are within range.
+- **Background Operation**: Continues to sync even when the app is backgrounded (using a foreground service).
+- **Material 3 UI**: Modern and clean interface built with Jetpack Compose.
+
+## Requirements
+
+### Hardware
+- An Android device running Android 13 (API level 33) or higher.
+- A supported Ricoh camera with BLE capabilities (e.g., Ricoh GR III, GR IIIx).
+
+### Permissions
+The app requires the following permissions to function correctly:
+- **Bluetooth**: For discovering and communicating with the camera.
+- **Location (Fine/Precise)**: Required by Android for BLE scanning and for providing GPS data to the camera.
+- **Notifications**: For the foreground service that maintains the connection in the background.
+- **Background Location**: To continue providing GPS data when the app is in the background (optional but recommended for full functionality).
 
 > [!IMPORTANT]
-> I have only tested this on my Pixel 9 running Android 15 and my GR IIIx. Any other configuration
-> _might_ work, but I haven't tested it and make no guarantees.
+> The app MUST be in the foreground during the initial connection to the camera. After the connection is established, it can safely run in the background. You may need to exclude the app from battery optimizations to ensure stable background operation.
 
-### License
+## Setup & Installation
+
+1. **Clone the repository**:
+   ```bash
+   git clone https://github.com/yourusername/RicohSync.git
+   cd RicohSync
+   ```
+
+2. **Open in Android Studio**:
+   Open the project in Android Studio (Ladybug or newer recommended).
+
+3. **Build the project**:
+   ```bash
+   ./gradlew build
+   ```
+
+## Running the App
+
+To install and run the debug version of the app on your connected device:
+
+```bash
+./gradlew installDebug
+```
+
+## Development & Scripts
+
+This project uses Gradle with Kotlin DSL.
+
+### Key Gradle Tasks
+- `./gradlew assembleDebug`: Build the debug APK.
+- `./gradlew bundleRelease`: Build the release App Bundle.
+- `./gradlew test`: Run unit tests.
+- `./gradlew connectedAndroidTest`: Run instrumented tests on a device.
+- `./gradlew ktfmtFormat`: Format the code using ktfmt (if configured).
+
+### Environment Variables
+No specific environment variables are required for a standard build. Ensure `JAVA_HOME` is set to a compatible JDK (JDK 11+).
+
+## Project Structure
+
+- `app/src/main/kotlin`: Main source code.
+    - `.../ble`: BLE communication logic and Ricoh GATT specifications.
+    - `.../data`: Repositories and data sources (Location, Camera, Protobuf).
+    - `.../devicesync`: Foreground service and synchronization logic.
+    - `.../domain`: Business logic, models, and repository interfaces.
+    - `.../scanning`: Camera discovery and pairing UI.
+    - `.../ui`: Theme and shared UI components.
+- `app/src/main/proto`: Protocol Buffer definitions for data storage.
+- `app/src/test`: Unit tests.
+
+## Technical Stack
+
+- **Language**: [Kotlin](https://kotlinlang.org/) (2.0.0)
+- **UI Framework**: [Jetpack Compose](https://developer.android.com/compose)
+- **BLE Library**: [Kable](https://github.com/JuulLabs/kable)
+- **Data Persistence**: [DataStore](https://developer.android.com/topic/libraries/architecture/datastore) with [Protocol Buffers](https://developers.google.com/protocol-buffers)
+- **Dependency Management**: Gradle Version Catalogs (`libs.versions.toml`)
+
+## Testing
+
+Run unit tests:
+```bash
+./gradlew test
+```
+
+> [!NOTE]
+> Primary test configuration used during development: Pixel 9 + Android 15 + Ricoh GR IIIx.
+
+## License
 
 Copyright 2024 Sebastiano Poggi
 

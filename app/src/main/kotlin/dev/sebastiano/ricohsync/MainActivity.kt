@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import dev.sebastiano.ricohsync.devicesync.DeviceSyncScreen
 import dev.sebastiano.ricohsync.devicesync.DeviceSyncViewModel
 import dev.sebastiano.ricohsync.devicesync.registerNotificationChannel
+import dev.sebastiano.ricohsync.domain.model.RicohCamera
 import dev.sebastiano.ricohsync.proto.pairedDevicesDataStore
 import dev.sebastiano.ricohsync.scanning.ScanningScreen
 import dev.sebastiano.ricohsync.scanning.ScanningViewModel
@@ -52,20 +53,17 @@ private fun RootComposable(mainViewModel: MainViewModel, context: Context) {
 
             MainState.NoDeviceSelected -> {
                 val scanningViewModel = remember { ScanningViewModel() }
-                ScanningScreen(scanningViewModel) {
-                    mainViewModel.saveSelectedDevice(
-                        macAddress = it.identifier,
-                        name = it.name ?: it.peripheralName,
-                    )
+                ScanningScreen(scanningViewModel) { camera ->
+                    mainViewModel.saveSelectedDevice(camera)
                 }
             }
 
-            is MainState.FindingDevice -> SearchingDevice(currentState)
+            is MainState.FindingDevice -> SearchingDevice(currentState.camera)
 
             is MainState.DeviceFound -> {
                 val deviceSyncViewModel = remember {
                     DeviceSyncViewModel(
-                        advertisement = currentState.advertisement,
+                        camera = currentState.camera,
                         onDeviceDisconnected = { mainViewModel.onDeviceDisconnected() },
                         bindingContextProvider = { context.applicationContext },
                     )
@@ -107,19 +105,19 @@ private fun StoppedScreen(onReconnect: () -> Unit) {
 }
 
 @Composable
-private fun SearchingDevice(currentState: MainState.FindingDevice) {
+private fun SearchingDevice(camera: RicohCamera) {
     Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
         Box(Modifier.fillMaxSize().padding(innerPadding), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
-                    "Looking for ${currentState.selectedDevice.name}...",
+                    "Looking for ${camera.name ?: "camera"}...",
                     style = MaterialTheme.typography.titleLarge,
                 )
 
                 Spacer(Modifier.height(8.dp))
 
                 Text(
-                    currentState.selectedDevice.macAddress,
+                    camera.macAddress,
                     style = MaterialTheme.typography.bodySmall,
                 )
             }

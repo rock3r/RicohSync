@@ -35,7 +35,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.unit.dp
-import com.juul.kable.ExperimentalApi
 import java.util.Locale
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.delay
@@ -92,32 +91,26 @@ private fun Connecting(state: DeviceSyncState.Connecting) {
 
         Spacer(Modifier.height(8.dp))
 
-        val name =
-            remember(state.advertisement) {
-                state.advertisement.name
-                    ?: state.advertisement.peripheralName
-                    ?: state.advertisement.identifier
-            }
+        val name = remember(state.camera) {
+            state.camera.name ?: state.camera.identifier
+        }
 
         Text("Connecting to $name...")
     }
 }
 
-@OptIn(ExperimentalApi::class)
 @Composable
 private fun Syncing(state: DeviceSyncState.Syncing) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         val rotateAnimation = rememberInfiniteTransition("sync_rotation")
-        val rotation by
-            rotateAnimation.animateFloat(
-                0f,
-                -1 * 360f,
-                animationSpec =
-                    InfiniteRepeatableSpec(
-                        tween(durationMillis = 1000, delayMillis = 800, easing = EaseInOut),
-                        repeatMode = RepeatMode.Restart,
-                    ),
-            )
+        val rotation by rotateAnimation.animateFloat(
+            0f,
+            -1 * 360f,
+            animationSpec = InfiniteRepeatableSpec(
+                tween(durationMillis = 1000, delayMillis = 800, easing = EaseInOut),
+                repeatMode = RepeatMode.Restart,
+            ),
+        )
         Icon(
             Icons.Rounded.Sync,
             contentDescription = null,
@@ -126,8 +119,7 @@ private fun Syncing(state: DeviceSyncState.Syncing) {
 
         Spacer(Modifier.height(24.dp))
 
-        val name =
-            remember(state.peripheral) { state.peripheral.name ?: state.peripheral.identifier }
+        val name = remember(state.camera) { state.camera.name ?: state.camera.identifier }
         Text("Syncing data to $name...", style = MaterialTheme.typography.bodyLarge)
 
         if (state.firmwareVersion != null) {
@@ -143,7 +135,7 @@ private fun Syncing(state: DeviceSyncState.Syncing) {
         var lastUpdate by remember { mutableStateOf<String?>(null) }
         LaunchedEffect(state.syncInfo) {
             while (true) {
-                lastUpdate = formatElapsedTimeSince(state.syncInfo?.dateTime)
+                lastUpdate = formatElapsedTimeSince(state.syncInfo?.syncTime)
                 delay(1.seconds)
             }
         }
@@ -154,17 +146,16 @@ private fun Syncing(state: DeviceSyncState.Syncing) {
 
         Spacer(Modifier.height(8.dp))
 
-        val location =
-            remember(state.syncInfo) {
-                val location = state.syncInfo?.location
-                if (location != null) {
-                    buildString {
-                        append(location.latitude.toString(decimals = 6))
-                        append(", ")
-                        append(location.longitude.toString(decimals = 6))
-                    }
-                } else null
-            }
+        val location = remember(state.syncInfo) {
+            val gpsLocation = state.syncInfo?.location
+            if (gpsLocation != null) {
+                buildString {
+                    append(gpsLocation.latitude.toString(decimals = 6))
+                    append(", ")
+                    append(gpsLocation.longitude.toString(decimals = 6))
+                }
+            } else null
+        }
 
         if (location != null) {
             Text("Last location: $location", style = MaterialTheme.typography.labelSmall)
@@ -175,7 +166,6 @@ private fun Syncing(state: DeviceSyncState.Syncing) {
 private fun Double.toString(decimals: Int): String =
     String.format(Locale.getDefault(), "%.${decimals}f", this)
 
-@OptIn(ExperimentalApi::class)
 @Composable
 private fun Reconnecting(state: DeviceSyncState.Disconnected) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -183,8 +173,7 @@ private fun Reconnecting(state: DeviceSyncState.Disconnected) {
 
         Spacer(Modifier.height(8.dp))
 
-        val name =
-            remember(state.peripheral) { state.peripheral.name ?: state.peripheral.identifier }
+        val name = remember(state.camera) { state.camera.name ?: state.camera.identifier }
 
         Text("Reconnecting to $name...")
     }

@@ -10,8 +10,8 @@ import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.juul.kable.Advertisement
-import com.juul.kable.Peripheral
+import dev.sebastiano.ricohsync.domain.model.LocationSyncInfo
+import dev.sebastiano.ricohsync.domain.model.RicohCamera
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
@@ -21,11 +21,17 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 
+/**
+ * ViewModel for the device sync screen.
+ *
+ * Manages the connection to the [DeviceSyncService] and exposes the sync state to the UI.
+ */
 internal class DeviceSyncViewModel(
-    private val advertisement: Advertisement,
-    private val onDeviceDisconnected: (Peripheral) -> Unit,
+    private val camera: RicohCamera,
+    private val onDeviceDisconnected: (RicohCamera) -> Unit,
     private val bindingContextProvider: () -> Context,
 ) : ViewModel() {
+
     private val _state = mutableStateOf<DeviceSyncState>(DeviceSyncState.Starting)
     val state: State<DeviceSyncState> = _state
 
@@ -40,6 +46,7 @@ internal class DeviceSyncViewModel(
             .launchIn(viewModelScope)
     }
 
+    /** Initiates connection to the camera and starts syncing. */
     fun connectAndSync() {
         startAndBindService(bindingContextProvider)
     }
@@ -50,36 +57,37 @@ internal class DeviceSyncViewModel(
             val intent = Intent(context, DeviceSyncService::class.java)
             context.startService(intent)
 
-            val connection =
-                object : ServiceConnection {
-                    override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
-                        serviceBinder.value = service as DeviceSyncService.DeviceSyncServiceBinder
-                    }
-
-                    override fun onServiceDisconnected(name: ComponentName?) {
-                        serviceBinder.value = null
-                    }
+            val connection = object : ServiceConnection {
+                override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
+                    serviceBinder.value = service as DeviceSyncService.DeviceSyncServiceBinder
                 }
-            context.bindService(intent, connection, 0 /* No flags */)
+
+                override fun onServiceDisconnected(name: ComponentName?) {
+                    serviceBinder.value = null
+                }
+            }
+            context.bindService(intent, connection, 0)
         }
     }
 
     private fun onBound(binder: DeviceSyncService.DeviceSyncServiceBinder) {
-        collectJob =
-            viewModelScope.launch(Dispatchers.Default) {
-                try {
-                    val service = DeviceSyncService.getInstanceFrom(binder)
-                    service.connectAndSync(advertisement)
-                    service.state.collect {
-                        _state.value = it
-                        if (it is DeviceSyncState.Disconnected) onDeviceDisconnected(it.peripheral)
+        collectJob = viewModelScope.launch(Dispatchers.Default) {
+            try {
+                val service = DeviceSyncService.getInstanceFrom(binder)
+                service.connectAndSync(camera)
+                service.state.collect { deviceSyncState ->
+                    _state.value = deviceSyncState
+                    if (deviceSyncState is DeviceSyncState.Disconnected) {
+                        onDeviceDisconnected(deviceSyncState.camera)
                     }
-                } catch (e: DeadObjectException) {
-                    onUnbound()
                 }
+            } catch (e: DeadObjectException) {
+                onUnbound()
             }
+        }
     }
 
+    /** Stops syncing and disconnects from the camera. */
     fun stopSyncAndDisconnect() {
         viewModelScope.launch {
             serviceBinder.value?.getService()?.stopAndDisconnect()
@@ -93,19 +101,25 @@ internal class DeviceSyncViewModel(
     }
 }
 
+/** UI state for the device sync screen. */
 internal sealed interface DeviceSyncState {
 
+    /** Service is starting. */
     data object Starting : DeviceSyncState
 
-    data class Connecting(val advertisement: Advertisement) : DeviceSyncState
+    /** Connecting to the camera. */
+    data class Connecting(val camera: RicohCamera) : DeviceSyncState
 
-    data class Disconnected(val peripheral: Peripheral) : DeviceSyncState
+    /** Connection lost or failed. */
+    data class Disconnected(val camera: RicohCamera) : DeviceSyncState
 
+    /** Connected and syncing. */
     data class Syncing(
-        val peripheral: Peripheral,
+        val camera: RicohCamera,
         val firmwareVersion: String?,
         val syncInfo: LocationSyncInfo?,
     ) : DeviceSyncState
 
+    /** Intentionally stopped. */
     data object Stopped : DeviceSyncState
 }

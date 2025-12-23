@@ -26,13 +26,16 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.juul.kable.Advertisement
+import dev.sebastiano.ricohsync.domain.model.RicohCamera
 
+/**
+ * Screen for discovering and selecting Ricoh cameras.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun ScanningScreen(
     viewModel: ScanningViewModel,
-    onDeviceSelected: (Advertisement) -> Unit,
+    onDeviceSelected: (RicohCamera) -> Unit,
 ) {
     val state by viewModel.state
     val currentState = state
@@ -45,7 +48,7 @@ internal fun ScanningScreen(
         },
         floatingActionButton = {
             FloatingActionButton(
-                onClick = { if (isScanning) viewModel.stopScan() else viewModel.doScan() }
+                onClick = { if (isScanning) viewModel.stopScan() else viewModel.doScan() },
             ) {
                 Icon(
                     if (isScanning) Icons.Rounded.Stop else Icons.Rounded.Refresh,
@@ -55,16 +58,16 @@ internal fun ScanningScreen(
         },
     ) { innerPadding ->
         if (currentState is PairingState.WithResults && currentState.found.isNotEmpty()) {
-            val found = (currentState as PairingState.WithResults).found
-            val foundDevices = found.values.sortedByDescending { it.peripheralName ?: it.name }
+            val foundDevices = currentState.found.values.sortedByDescending { it.name }
 
             LazyColumn(contentPadding = innerPadding) {
-                items(foundDevices, key = { it.identifier }) { advertisement ->
+                items(foundDevices, key = { it.identifier }) { camera ->
                     DiscoveredDevice(
-                        advertisement,
-                        Modifier.fillMaxWidth().heightIn(48.dp).clickable {
-                            onDeviceSelected(advertisement)
-                        },
+                        camera = camera,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(48.dp)
+                            .clickable { onDeviceSelected(camera) },
                     )
                 }
             }
@@ -77,16 +80,16 @@ internal fun ScanningScreen(
 }
 
 @Composable
-private fun DiscoveredDevice(advertisement: Advertisement, modifier: Modifier) {
-    val name = advertisement.name ?: advertisement.peripheralName
+private fun DiscoveredDevice(camera: RicohCamera, modifier: Modifier) {
+    val name = camera.name
     if (name != null) {
         Column(modifier.padding(horizontal = 16.dp)) {
             Text(name, style = MaterialTheme.typography.bodyMedium, maxLines = 1)
-            Text(advertisement.identifier, style = MaterialTheme.typography.labelSmall)
+            Text(camera.macAddress, style = MaterialTheme.typography.labelSmall)
         }
     } else {
         Row(modifier.padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(advertisement.identifier, style = MaterialTheme.typography.bodyMedium)
+            Text(camera.macAddress, style = MaterialTheme.typography.bodyMedium)
         }
     }
 }
