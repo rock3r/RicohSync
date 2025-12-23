@@ -16,15 +16,16 @@ import dev.sebastiano.ricohsync.domain.model.RicohCamera
 import dev.sebastiano.ricohsync.domain.repository.CameraConnection
 import dev.sebastiano.ricohsync.domain.repository.CameraRepository
 import java.time.ZonedDateTime
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlin.uuid.ExperimentalUuidApi
 
 private const val TAG = "KableCameraRepository"
 
 /**
  * Implementation of [CameraRepository] using the Kable BLE library.
  */
+@OptIn(ExperimentalUuidApi::class)
 class KableCameraRepository : CameraRepository {
 
     @OptIn(ObsoleteKableApi::class)
@@ -112,6 +113,7 @@ class KableCameraRepository : CameraRepository {
 /**
  * Implementation of [CameraConnection] using a Kable Peripheral.
  */
+@OptIn(ExperimentalUuidApi::class)
 internal class KableCameraConnection(
     override val camera: RicohCamera,
     private val peripheral: Peripheral,
@@ -119,11 +121,10 @@ internal class KableCameraConnection(
 
     override suspend fun readFirmwareVersion(): String {
         val service = peripheral.services.value.orEmpty().first {
-            it.serviceUuid.toString() == RicohGattSpec.Firmware.SERVICE_UUID.toString()
+            it.serviceUuid == RicohGattSpec.Firmware.SERVICE_UUID
         }
         val char = service.characteristics.first {
-            it.characteristicUuid.toString() ==
-                RicohGattSpec.Firmware.VERSION_CHARACTERISTIC_UUID.toString()
+            it.characteristicUuid == RicohGattSpec.Firmware.VERSION_CHARACTERISTIC_UUID
         }
 
         val firmwareBytes = peripheral.read(char)
@@ -134,11 +135,10 @@ internal class KableCameraConnection(
 
     override suspend fun setPairedDeviceName(name: String) {
         val service = peripheral.services.value.orEmpty().first {
-            it.serviceUuid.toString() == RicohGattSpec.DeviceName.SERVICE_UUID.toString()
+            it.serviceUuid == RicohGattSpec.DeviceName.SERVICE_UUID
         }
         val char = service.characteristics.first {
-            it.characteristicUuid.toString() ==
-                RicohGattSpec.DeviceName.NAME_CHARACTERISTIC_UUID.toString()
+            it.characteristicUuid == RicohGattSpec.DeviceName.NAME_CHARACTERISTIC_UUID
         }
 
         Log.i(TAG, "Setting paired device name: $name")
@@ -151,11 +151,10 @@ internal class KableCameraConnection(
 
     override suspend fun syncDateTime(dateTime: ZonedDateTime) {
         val service = peripheral.services.value.orEmpty().first {
-            it.serviceUuid.toString() == RicohGattSpec.DateTime.SERVICE_UUID.toString()
+            it.serviceUuid == RicohGattSpec.DateTime.SERVICE_UUID
         }
         val char = service.characteristics.first {
-            it.characteristicUuid.toString() ==
-                RicohGattSpec.DateTime.DATE_TIME_CHARACTERISTIC_UUID.toString()
+            it.characteristicUuid == RicohGattSpec.DateTime.DATE_TIME_CHARACTERISTIC_UUID
         }
 
         val data = RicohProtocol.encodeDateTime(dateTime)
@@ -170,11 +169,10 @@ internal class KableCameraConnection(
 
     override suspend fun readDateTime(): ByteArray {
         val service = peripheral.services.value.orEmpty().first {
-            it.serviceUuid.toString() == RicohGattSpec.DateTime.SERVICE_UUID.toString()
+            it.serviceUuid == RicohGattSpec.DateTime.SERVICE_UUID
         }
         val char = service.characteristics.first {
-            it.characteristicUuid.toString() ==
-                RicohGattSpec.DateTime.DATE_TIME_CHARACTERISTIC_UUID.toString()
+            it.characteristicUuid == RicohGattSpec.DateTime.DATE_TIME_CHARACTERISTIC_UUID
         }
 
         val data = peripheral.read(char)
@@ -189,11 +187,10 @@ internal class KableCameraConnection(
 
     override suspend fun setGeoTaggingEnabled(enabled: Boolean) {
         val service = peripheral.services.value.orEmpty().first {
-            it.serviceUuid.toString() == RicohGattSpec.DateTime.SERVICE_UUID.toString()
+            it.serviceUuid == RicohGattSpec.DateTime.SERVICE_UUID
         }
         val char = service.characteristics.first {
-            it.characteristicUuid.toString() ==
-                RicohGattSpec.DateTime.GEO_TAGGING_CHARACTERISTIC_UUID.toString()
+            it.characteristicUuid == RicohGattSpec.DateTime.GEO_TAGGING_CHARACTERISTIC_UUID
         }
 
         val currentlyEnabled = isGeoTaggingEnabled()
@@ -212,11 +209,10 @@ internal class KableCameraConnection(
 
     override suspend fun isGeoTaggingEnabled(): Boolean {
         val service = peripheral.services.value.orEmpty().first {
-            it.serviceUuid.toString() == RicohGattSpec.DateTime.SERVICE_UUID.toString()
+            it.serviceUuid == RicohGattSpec.DateTime.SERVICE_UUID
         }
         val char = service.characteristics.first {
-            it.characteristicUuid.toString() ==
-                RicohGattSpec.DateTime.GEO_TAGGING_CHARACTERISTIC_UUID.toString()
+            it.characteristicUuid == RicohGattSpec.DateTime.GEO_TAGGING_CHARACTERISTIC_UUID
         }
 
         val data = peripheral.read(char)
@@ -227,11 +223,10 @@ internal class KableCameraConnection(
 
     override suspend fun syncLocation(location: GpsLocation) {
         val service = peripheral.services.value.orEmpty().first {
-            it.serviceUuid.toString() == RicohGattSpec.Location.SERVICE_UUID.toString()
+            it.serviceUuid == RicohGattSpec.Location.SERVICE_UUID
         }
         val char = service.characteristics.first {
-            it.characteristicUuid.toString() ==
-                RicohGattSpec.Location.LOCATION_CHARACTERISTIC_UUID.toString()
+            it.characteristicUuid == RicohGattSpec.Location.LOCATION_CHARACTERISTIC_UUID
         }
 
         val data = RicohProtocol.encodeLocation(location)
@@ -248,7 +243,6 @@ internal class KableCameraConnection(
     override suspend fun disconnect() {
         Log.i(TAG, "Disconnecting from ${camera.name}")
         peripheral.disconnect()
-        peripheral.cancel("Disconnecting")
     }
 
     companion object {

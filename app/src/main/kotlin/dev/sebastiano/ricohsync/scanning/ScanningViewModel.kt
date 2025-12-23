@@ -23,6 +23,7 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.onStart
+import kotlin.uuid.ExperimentalUuidApi
 
 private const val TAG = "ScanningViewModel"
 
@@ -31,6 +32,7 @@ private const val TAG = "ScanningViewModel"
  *
  * Manages BLE scanning for Ricoh cameras and exposes discovered devices to the UI.
  */
+@OptIn(ExperimentalUuidApi::class)
 internal class ScanningViewModel : ViewModel() {
 
     private val _state = mutableStateOf<PairingState>(PairingState.Loading)
