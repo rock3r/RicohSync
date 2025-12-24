@@ -1,47 +1,18 @@
+@file:Suppress("DEPRECATION")
 package dev.sebastiano.ricohsync.ble
 
-import kotlin.uuid.ExperimentalUuidApi
-import kotlin.uuid.Uuid
-
 /**
- * GATT specification for Ricoh cameras.
+ * Backward compatibility typealias for RicohGattSpec.
  *
- * Contains all known service and characteristic UUIDs used for communication with Ricoh cameras
- * over Bluetooth Low Energy.
+ * @deprecated This class has been moved to vendors.ricoh package.
+ *   Use dev.sebastiano.ricohsync.vendors.ricoh.RicohGattSpec instead.
  */
-@OptIn(ExperimentalUuidApi::class)
-object RicohGattSpec {
-
-    /** Service UUID used for scanning and filtering Ricoh camera advertisements. */
-    val SCAN_FILTER_SERVICE_UUID: Uuid =
-        Uuid.parse("84A0DD62-E8AA-4D0F-91DB-819B6724C69E")
-
-    /** Firmware version service and characteristic. */
-    object Firmware {
-        val SERVICE_UUID: Uuid = Uuid.parse("9a5ed1c5-74cc-4c50-b5b6-66a48e7ccff1")
-        val VERSION_CHARACTERISTIC_UUID: Uuid =
-            Uuid.parse("b4eb8905-7411-40a6-a367-2834c2157ea7")
-    }
-
-    /** Paired device name service and characteristic. */
-    object DeviceName {
-        val SERVICE_UUID: Uuid = Uuid.parse("0f291746-0c80-4726-87a7-3c501fd3b4b6")
-        val NAME_CHARACTERISTIC_UUID: Uuid = Uuid.parse("fe3a32f8-a189-42de-a391-bc81ae4daa76")
-    }
-
-    /** Date/time and geo-tagging service and characteristics. */
-    object DateTime {
-        val SERVICE_UUID: Uuid = Uuid.parse("4b445988-caa0-4dd3-941d-37b4f52aca86")
-        val DATE_TIME_CHARACTERISTIC_UUID: Uuid =
-            Uuid.parse("fa46bbdd-8a8f-4796-8cf3-aa58949b130a")
-        val GEO_TAGGING_CHARACTERISTIC_UUID: Uuid =
-            Uuid.parse("a36afdcf-6b67-4046-9be7-28fb67dbc071")
-    }
-
-    /** Location sync service and characteristic. */
-    object Location {
-        val SERVICE_UUID: Uuid = Uuid.parse("84a0dd62-e8aa-4d0f-91db-819b6724c69e")
-        val LOCATION_CHARACTERISTIC_UUID: Uuid =
-            Uuid.parse("28f59d60-8b8e-4fcd-a81f-61bdb46595a9")
-    }
-}
+@Deprecated(
+    message = "Moved to vendors.ricoh package",
+    replaceWith = ReplaceWith(
+        "dev.sebastiano.ricohsync.vendors.ricoh.RicohGattSpec",
+        "dev.sebastiano.ricohsync.vendors.ricoh.RicohGattSpec"
+    ),
+    level = DeprecationLevel.WARNING,
+)
+typealias RicohGattSpec = dev.sebastiano.ricohsync.vendors.ricoh.RicohGattSpec

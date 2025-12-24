@@ -1,24 +1,25 @@
 package dev.sebastiano.ricohsync.domain.repository
 
+import dev.sebastiano.ricohsync.domain.model.Camera
 import dev.sebastiano.ricohsync.domain.model.GpsLocation
-import dev.sebastiano.ricohsync.domain.model.RicohCamera
 import java.time.ZonedDateTime
 import kotlinx.coroutines.flow.Flow
 
 /**
- * Repository interface for Ricoh camera BLE operations.
+ * Repository interface for camera BLE operations.
  *
  * Abstracts the BLE communication layer to allow for easier testing.
+ * Supports cameras from multiple vendors (Ricoh, Canon, Nikon, etc.).
  */
 interface CameraRepository {
 
     /** Flow of discovered cameras during scanning. */
-    val discoveredCameras: Flow<RicohCamera>
+    val discoveredCameras: Flow<Camera>
 
-    /** Starts scanning for Ricoh cameras. */
+    /** Starts scanning for supported cameras from all registered vendors. */
     fun startScanning()
 
-    /** Stops scanning for Ricoh cameras. */
+    /** Stops scanning for cameras. */
     fun stopScanning()
 
     /**
@@ -26,25 +27,26 @@ interface CameraRepository {
      *
      * @return Flow that emits the camera when found.
      */
-    fun findCameraByMacAddress(macAddress: String): Flow<RicohCamera>
+    fun findCameraByMacAddress(macAddress: String): Flow<Camera>
 
     /**
      * Connects to the specified camera.
      *
      * @return A [CameraConnection] for interacting with the connected camera.
      */
-    suspend fun connect(camera: RicohCamera): CameraConnection
+    suspend fun connect(camera: Camera): CameraConnection
 }
 
 /**
- * Represents an active connection to a Ricoh camera.
+ * Represents an active connection to a camera.
  *
  * This interface provides methods to interact with a connected camera.
+ * The actual capabilities available depend on the camera vendor.
  */
 interface CameraConnection {
 
     /** The camera this connection is for. */
-    val camera: RicohCamera
+    val camera: Camera
 
     /** Reads the camera's firmware version. */
     suspend fun readFirmwareVersion(): String

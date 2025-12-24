@@ -10,8 +10,8 @@ import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import dev.sebastiano.ricohsync.domain.model.Camera
 import dev.sebastiano.ricohsync.domain.model.LocationSyncInfo
-import dev.sebastiano.ricohsync.domain.model.RicohCamera
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
@@ -27,8 +27,8 @@ import kotlinx.coroutines.launch
  * Manages the connection to the [DeviceSyncService] and exposes the sync state to the UI.
  */
 internal class DeviceSyncViewModel(
-    private val camera: RicohCamera,
-    private val onDeviceDisconnected: (RicohCamera) -> Unit,
+    private val camera: Camera,
+    private val onDeviceDisconnected: (Camera) -> Unit,
     private val bindingContextProvider: () -> Context,
 ) : ViewModel() {
 
@@ -108,14 +108,14 @@ internal sealed interface DeviceSyncState {
     data object Starting : DeviceSyncState
 
     /** Connecting to the camera. */
-    data class Connecting(val camera: RicohCamera) : DeviceSyncState
+    data class Connecting(val camera: Camera) : DeviceSyncState
 
     /** Connection lost or failed. */
-    data class Disconnected(val camera: RicohCamera) : DeviceSyncState
+    data class Disconnected(val camera: Camera) : DeviceSyncState
 
     /** Connected and syncing. */
     data class Syncing(
-        val camera: RicohCamera,
+        val camera: Camera,
         val firmwareVersion: String?,
         val syncInfo: LocationSyncInfo?,
     ) : DeviceSyncState

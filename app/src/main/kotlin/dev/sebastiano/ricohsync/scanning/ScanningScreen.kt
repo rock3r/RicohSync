@@ -26,16 +26,16 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import dev.sebastiano.ricohsync.domain.model.RicohCamera
+import dev.sebastiano.ricohsync.domain.model.Camera
 
 /**
- * Screen for discovering and selecting Ricoh cameras.
+ * Screen for discovering and selecting cameras.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun ScanningScreen(
     viewModel: ScanningViewModel,
-    onDeviceSelected: (RicohCamera) -> Unit,
+    onDeviceSelected: (Camera) -> Unit,
 ) {
     val state by viewModel.state
     val currentState = state
@@ -80,7 +80,7 @@ internal fun ScanningScreen(
 }
 
 @Composable
-private fun DiscoveredDevice(camera: RicohCamera, modifier: Modifier) {
+private fun DiscoveredDevice(camera: Camera, modifier: Modifier) {
     val name = camera.name
     if (name != null) {
         Column(modifier.padding(horizontal = 16.dp)) {
