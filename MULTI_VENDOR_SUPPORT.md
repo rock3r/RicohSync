@@ -163,9 +163,10 @@ fun createVendorRegistry(): CameraVendorRegistry {
     return DefaultCameraVendorRegistry(
         vendors = listOf(
             RicohCameraVendor,
-            CanonCameraVendor,  // Add your new vendor here
+            SonyCameraVendor,
+            // Add more vendors here:
+            // CanonCameraVendor,
             // NikonCameraVendor,
-            // SonyCameraVendor,
         ),
     )
 }

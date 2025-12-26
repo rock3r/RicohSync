@@ -3,6 +3,7 @@ package dev.sebastiano.ricohsync
 import dev.sebastiano.ricohsync.domain.vendor.CameraVendorRegistry
 import dev.sebastiano.ricohsync.domain.vendor.DefaultCameraVendorRegistry
 import dev.sebastiano.ricohsync.vendors.ricoh.RicohCameraVendor
+import dev.sebastiano.ricohsync.vendors.sony.SonyCameraVendor
 
 /**
  * Application-level configuration and dependency creation for RicohSync.
@@ -14,6 +15,7 @@ object RicohSyncApp {
      *
      * Currently supports:
      * - Ricoh cameras (GR IIIx, GR III, etc.)
+     * - Sony Alpha cameras (via DI Remote Control protocol)
      *
      * To add support for additional camera vendors:
      * 1. Create a new vendor package (e.g., vendors/canon/)
@@ -24,10 +26,10 @@ object RicohSyncApp {
         return DefaultCameraVendorRegistry(
             vendors = listOf(
                 RicohCameraVendor,
+                SonyCameraVendor,
                 // Add more vendors here:
                 // CanonCameraVendor,
                 // NikonCameraVendor,
-                // SonyCameraVendor,
             ),
         )
     }
