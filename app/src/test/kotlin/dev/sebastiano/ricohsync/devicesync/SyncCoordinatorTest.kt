@@ -7,21 +7,19 @@ import dev.sebastiano.ricohsync.domain.model.SyncState
 import dev.sebastiano.ricohsync.domain.repository.CameraConnection
 import dev.sebastiano.ricohsync.domain.repository.CameraRepository
 import dev.sebastiano.ricohsync.domain.repository.LocationRepository
+import dev.sebastiano.ricohsync.fakes.FakeCameraConnection
+import dev.sebastiano.ricohsync.fakes.FakeCameraRepository
+import dev.sebastiano.ricohsync.fakes.FakeLocationRepository
 import dev.sebastiano.ricohsync.vendors.ricoh.RicohCameraVendor
-import io.mockk.coEvery
-import io.mockk.coVerify
 import io.mockk.every
-import io.mockk.mockk
 import io.mockk.mockkStatic
 import io.mockk.unmockkStatic
-import io.mockk.verify
 import java.time.ZoneId
 import java.time.ZonedDateTime
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -37,9 +35,9 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 class SyncCoordinatorTest {
 
-    private lateinit var cameraRepository: CameraRepository
-    private lateinit var locationRepository: LocationRepository
-    private lateinit var cameraConnection: CameraConnection
+    private lateinit var cameraRepository: FakeCameraRepository
+    private lateinit var locationRepository: FakeLocationRepository
+    private lateinit var cameraConnection: FakeCameraConnection
     private lateinit var testScope: TestScope
     private lateinit var syncCoordinator: SyncCoordinator
 
@@ -66,13 +64,12 @@ class SyncCoordinatorTest {
         every { Log.e(any<String>(), any<String>()) } returns 0
         every { Log.e(any<String>(), any<String>(), any<Throwable>()) } returns 0
 
-        cameraRepository = mockk(relaxed = true)
-        locationRepository = mockk(relaxed = true)
-        cameraConnection = mockk(relaxed = true)
+        cameraRepository = FakeCameraRepository()
+        locationRepository = FakeLocationRepository()
+        cameraConnection = FakeCameraConnection(testCamera)
+        cameraRepository.connectionToReturn = cameraConnection
 
         testScope = TestScope(UnconfinedTestDispatcher())
-
-        every { locationRepository.locationUpdates } returns MutableStateFlow(null)
 
         syncCoordinator = SyncCoordinator(
             cameraRepository = cameraRepository,
@@ -96,11 +93,7 @@ class SyncCoordinatorTest {
 
     @Test
     fun `startSync transitions to Connecting state`() = testScope.runTest {
-        coEvery { cameraRepository.connect(testCamera) } coAnswers {
-            // Simulate connection delay
-            delay(1000)
-            cameraConnection
-        }
+        cameraRepository.connectDelay = 1000L
 
         syncCoordinator.startSync(testCamera)
 
@@ -109,9 +102,6 @@ class SyncCoordinatorTest {
 
     @Test
     fun `isSyncing returns true when sync is in progress`() = testScope.runTest {
-        coEvery { cameraRepository.connect(testCamera) } returns cameraConnection
-        coEvery { cameraConnection.readFirmwareVersion() } returns "1.0.0"
-
         assertFalse(syncCoordinator.isSyncing())
 
         syncCoordinator.startSync(testCamera)
@@ -121,23 +111,19 @@ class SyncCoordinatorTest {
 
     @Test
     fun `startSync performs initial setup on camera`() = testScope.runTest {
-        coEvery { cameraRepository.connect(testCamera) } returns cameraConnection
-        coEvery { cameraConnection.readFirmwareVersion() } returns "1.0.0"
-
         syncCoordinator.startSync(testCamera)
         advanceUntilIdle()
 
-        coVerify { cameraConnection.readDateTime() }
-        coVerify { cameraConnection.readFirmwareVersion() }
-        coVerify { cameraConnection.setPairedDeviceName("Test Device RicohSync") }
-        coVerify { cameraConnection.syncDateTime(any()) }
-        coVerify { cameraConnection.setGeoTaggingEnabled(true) }
+        assertTrue(cameraConnection.readDateTimeCalled)
+        assertTrue(cameraConnection.readFirmwareVersionCalled)
+        assertEquals("Test Device RicohSync", cameraConnection.pairedDeviceName)
+        assertTrue(cameraConnection.syncedDateTime != null)
+        assertTrue(cameraConnection.geoTaggingEnabled)
     }
 
     @Test
     fun `startSync transitions to Syncing state after setup`() = testScope.runTest {
-        coEvery { cameraRepository.connect(testCamera) } returns cameraConnection
-        coEvery { cameraConnection.readFirmwareVersion() } returns "1.0.0"
+        cameraConnection.firmwareVersion = "1.0.0"
 
         syncCoordinator.startSync(testCamera)
         advanceUntilIdle()
@@ -150,36 +136,25 @@ class SyncCoordinatorTest {
 
     @Test
     fun `startSync starts location updates`() = testScope.runTest {
-        coEvery { cameraRepository.connect(testCamera) } returns cameraConnection
-        coEvery { cameraConnection.readFirmwareVersion() } returns "1.0.0"
-
         syncCoordinator.startSync(testCamera)
         advanceUntilIdle()
 
-        verify { locationRepository.startLocationUpdates() }
+        assertTrue(locationRepository.startLocationUpdatesCalled)
     }
 
     @Test
     fun `location updates are synced to camera`() = testScope.runTest {
-        val locationFlow = MutableStateFlow<GpsLocation?>(null)
-        every { locationRepository.locationUpdates } returns locationFlow
-        coEvery { cameraRepository.connect(testCamera) } returns cameraConnection
-        coEvery { cameraConnection.readFirmwareVersion() } returns "1.0.0"
-
         syncCoordinator.startSync(testCamera)
         advanceUntilIdle()
 
-        locationFlow.value = testLocation
+        locationRepository.emit(testLocation)
         advanceUntilIdle()
 
-        coVerify { cameraConnection.syncLocation(testLocation) }
+        assertEquals(testLocation, cameraConnection.lastSyncedLocation)
     }
 
     @Test
     fun `stopSync transitions to Stopped state`() = testScope.runTest {
-        coEvery { cameraRepository.connect(testCamera) } returns cameraConnection
-        coEvery { cameraConnection.readFirmwareVersion() } returns "1.0.0"
-
         syncCoordinator.startSync(testCamera)
         advanceUntilIdle()
 
@@ -191,37 +166,28 @@ class SyncCoordinatorTest {
 
     @Test
     fun `stopSync disconnects from camera`() = testScope.runTest {
-        coEvery { cameraRepository.connect(testCamera) } returns cameraConnection
-        coEvery { cameraConnection.readFirmwareVersion() } returns "1.0.0"
-
         syncCoordinator.startSync(testCamera)
         advanceUntilIdle()
 
         syncCoordinator.stopSync()
         advanceUntilIdle()
 
-        coVerify { cameraConnection.disconnect() }
+        assertTrue(cameraConnection.disconnectCalled)
     }
 
     @Test
     fun `stopSync stops location updates`() = testScope.runTest {
-        coEvery { cameraRepository.connect(testCamera) } returns cameraConnection
-        coEvery { cameraConnection.readFirmwareVersion() } returns "1.0.0"
-
         syncCoordinator.startSync(testCamera)
         advanceUntilIdle()
 
         syncCoordinator.stopSync()
         advanceUntilIdle()
 
-        verify { locationRepository.stopLocationUpdates() }
+        assertTrue(locationRepository.stopLocationUpdatesCalled)
     }
 
     @Test
     fun `stopSync clears syncing flag`() = testScope.runTest {
-        coEvery { cameraRepository.connect(testCamera) } returns cameraConnection
-        coEvery { cameraConnection.readFirmwareVersion() } returns "1.0.0"
-
         syncCoordinator.startSync(testCamera)
         advanceUntilIdle()
         assertTrue(syncCoordinator.isSyncing())
@@ -234,7 +200,7 @@ class SyncCoordinatorTest {
 
     @Test
     fun `connection error transitions to Disconnected state`() = testScope.runTest {
-        coEvery { cameraRepository.connect(testCamera) } throws RuntimeException("Connection failed")
+        cameraRepository.connectException = RuntimeException("Connection failed")
 
         syncCoordinator.startSync(testCamera)
         advanceUntilIdle()
@@ -246,35 +212,30 @@ class SyncCoordinatorTest {
 
     @Test
     fun `duplicate startSync calls are ignored`() = testScope.runTest {
-        coEvery { cameraRepository.connect(testCamera) } returns cameraConnection
-        coEvery { cameraConnection.readFirmwareVersion() } returns "1.0.0"
-
+        // We can't easily count calls with current fake without adding a counter
+        // Let's add a counter to connect call in FakeCameraRepository
         syncCoordinator.startSync(testCamera)
         syncCoordinator.startSync(testCamera) // Should be ignored
 
         advanceUntilIdle()
 
-        // Should only connect once
-        coVerify(exactly = 1) { cameraRepository.connect(testCamera) }
+        assertEquals(1, cameraRepository.connectCallCount)
     }
 
     @Test
     fun `findAndSync locates camera and starts sync`() = testScope.runTest {
-        every { cameraRepository.findCameraByMacAddress(testCamera.macAddress) } returns flowOf(testCamera)
-        coEvery { cameraRepository.connect(testCamera) } returns cameraConnection
-        coEvery { cameraConnection.readFirmwareVersion() } returns "1.0.0"
+        cameraRepository.cameraToReturn = testCamera
 
         syncCoordinator.findAndSync(testCamera.macAddress)
         advanceUntilIdle()
 
-        verify { cameraRepository.findCameraByMacAddress(testCamera.macAddress) }
-        coVerify { cameraRepository.connect(testCamera) }
+        assertEquals(1, cameraRepository.connectCallCount)
+        assertEquals(testCamera, cameraConnection.camera)
     }
 
     @Test
     fun `syncing state includes firmware version`() = testScope.runTest {
-        coEvery { cameraRepository.connect(testCamera) } returns cameraConnection
-        coEvery { cameraConnection.readFirmwareVersion() } returns "2.5.1"
+        cameraConnection.firmwareVersion = "2.5.1"
 
         syncCoordinator.startSync(testCamera)
         advanceUntilIdle()
@@ -285,15 +246,10 @@ class SyncCoordinatorTest {
 
     @Test
     fun `syncing state updates with location sync info`() = testScope.runTest {
-        val locationFlow = MutableStateFlow<GpsLocation?>(null)
-        every { locationRepository.locationUpdates } returns locationFlow
-        coEvery { cameraRepository.connect(testCamera) } returns cameraConnection
-        coEvery { cameraConnection.readFirmwareVersion() } returns "1.0.0"
-
         syncCoordinator.startSync(testCamera)
         advanceUntilIdle()
 
-        locationFlow.value = testLocation
+        locationRepository.emit(testLocation)
         advanceUntilIdle()
 
         val state = syncCoordinator.state.value as SyncState.Syncing
