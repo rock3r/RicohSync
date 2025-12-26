@@ -9,17 +9,17 @@ sealed interface SyncState {
     data object Idle : SyncState
 
     /** Currently connecting to the camera. */
-    data class Connecting(val camera: RicohCamera) : SyncState
+    data class Connecting(val camera: Camera) : SyncState
 
     /** Connected and actively syncing data. */
     data class Syncing(
-        val camera: RicohCamera,
+        val camera: Camera,
         val firmwareVersion: String?,
         val lastSyncInfo: LocationSyncInfo?,
     ) : SyncState
 
     /** Connection was lost or failed. */
-    data class Disconnected(val camera: RicohCamera) : SyncState
+    data class Disconnected(val camera: Camera) : SyncState
 
     /** Intentionally stopped by user. */
     data object Stopped : SyncState

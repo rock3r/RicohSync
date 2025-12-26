@@ -13,8 +13,9 @@ import com.juul.kable.PlatformAdvertisement
 import com.juul.kable.Scanner
 import com.juul.kable.logs.Logging
 import com.juul.kable.logs.SystemLogEngine
-import dev.sebastiano.ricohsync.ble.RicohGattSpec
-import dev.sebastiano.ricohsync.domain.model.RicohCamera
+import dev.sebastiano.ricohsync.RicohSyncApp
+import dev.sebastiano.ricohsync.domain.model.Camera
+import dev.sebastiano.ricohsync.domain.vendor.CameraVendorRegistry
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
@@ -30,7 +31,8 @@ private const val TAG = "ScanningViewModel"
 /**
  * ViewModel for the camera scanning screen.
  *
- * Manages BLE scanning for Ricoh cameras and exposes discovered devices to the UI.
+ * Manages BLE scanning for supported cameras and exposes discovered devices to the UI.
+ * Supports multiple camera vendors through the camera vendor registry.
  */
 @OptIn(ExperimentalUuidApi::class)
 internal class ScanningViewModel : ViewModel() {
@@ -40,10 +42,15 @@ internal class ScanningViewModel : ViewModel() {
 
     private var scanJob: Job? = null
 
+    private val vendorRegistry: CameraVendorRegistry = RicohSyncApp.createVendorRegistry()
+
     @OptIn(ObsoleteKableApi::class)
     private val scanner = Scanner {
         filters {
-            match { services = listOf(RicohGattSpec.SCAN_FILTER_SERVICE_UUID) }
+            // Scan for all supported camera vendors
+            vendorRegistry.getAllScanFilterUuids().forEach { uuid ->
+                match { services = listOf(uuid) }
+            }
         }
         logging {
             engine = SystemLogEngine
@@ -59,7 +66,7 @@ internal class ScanningViewModel : ViewModel() {
         doScan()
     }
 
-    /** Starts scanning for Ricoh cameras. */
+    /** Starts scanning for supported cameras. */
     fun doScan() {
         if (scanJob != null) return
         _state.value = PairingState.Scanning(mutableStateMapOf())
@@ -79,7 +86,10 @@ internal class ScanningViewModel : ViewModel() {
 
     private fun onDiscovery(advertisement: PlatformAdvertisement) {
         val currentState = _state.value as PairingState.Scanning
-        currentState.found[advertisement.identifier] = advertisement.toRicohCamera()
+        val camera = advertisement.toCamera()
+        if (camera != null) {
+            currentState.found[advertisement.identifier] = camera
+        }
     }
 
     /** Stops the current scan. */
@@ -98,11 +108,30 @@ internal class ScanningViewModel : ViewModel() {
         _state.value = PairingState.Done(discoveredDevices)
     }
 
-    private fun PlatformAdvertisement.toRicohCamera(): RicohCamera = RicohCamera(
-        identifier = identifier,
-        name = peripheralName ?: name,
-        macAddress = identifier,
-    )
+    /**
+     * Converts a BLE advertisement to a Camera by identifying the vendor.
+     *
+     * @return A Camera instance if a vendor is recognized, or null if no vendor matches.
+     */
+    private fun PlatformAdvertisement.toCamera(): Camera? {
+        val vendor = vendorRegistry.identifyVendor(
+            deviceName = peripheralName ?: name,
+            serviceUuids = uuids,
+        )
+
+        if (vendor == null) {
+            Log.w(TAG, "No vendor recognized for device: ${peripheralName ?: name}")
+            return null
+        }
+
+        Log.i(TAG, "Discovered ${vendor.vendorName} camera: ${peripheralName ?: name}")
+        return Camera(
+            identifier = identifier,
+            name = peripheralName ?: name,
+            macAddress = identifier,
+            vendor = vendor,
+        )
+    }
 }
 
 /** State of the camera pairing/scanning process. */
@@ -112,15 +141,15 @@ internal sealed interface PairingState {
     data object Loading : PairingState
 
     /** Actively scanning for cameras. */
-    data class Scanning(override val found: SnapshotStateMap<String, RicohCamera>) :
+    data class Scanning(override val found: SnapshotStateMap<String, Camera>) :
         PairingState, WithResults
 
     /** Scanning completed. */
-    data class Done(override val found: SnapshotStateMap<String, RicohCamera>) :
+    data class Done(override val found: SnapshotStateMap<String, Camera>) :
         PairingState, WithResults
 
     /** Interface for states that have scan results. */
     interface WithResults {
-        val found: Map<String, RicohCamera>
+        val found: Map<String, Camera>
     }
 }

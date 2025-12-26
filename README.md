@@ -1,11 +1,14 @@
 # RicohSync
 
-A simple Android application that synchronizes GPS data and date/time from your Android phone to your Ricoh camera via Bluetooth Low Energy (BLE).
+A simple Android application that synchronizes GPS data and date/time from your Android phone to your camera via Bluetooth Low Energy (BLE).
+
+While originally built for Ricoh cameras, the app now supports a multi-vendor architecture, allowing it to be extended to other camera brands.
 
 The app allows you to select your camera from nearby BLE devices on the first start. Once paired, it automatically reconnects and maintains synchronization in the background whenever the camera's Bluetooth is active.
 
 ## Features
 
+- **Multi-Vendor Support**: Built with an extensible architecture to support various camera brands (Ricoh currently supported).
 - **Automatic Synchronization**: Real-time GPS location and date/time sync.
 - **Auto-reconnection**: Automatically reconnects to paired cameras when they are within range.
 - **Background Operation**: Continues to sync even when the app is backgrounded (using a foreground service).
@@ -15,7 +18,7 @@ The app allows you to select your camera from nearby BLE devices on the first st
 
 ### Hardware
 - An Android device running Android 13 (API level 33) or higher.
-- A supported Ricoh camera with BLE capabilities (e.g., Ricoh GR III, GR IIIx).
+- A supported BLE-enabled camera (e.g., Ricoh GR III, GR IIIx).
 
 ### Permissions
 The app requires the following permissions to function correctly:
@@ -26,6 +29,12 @@ The app requires the following permissions to function correctly:
 
 > [!IMPORTANT]
 > The app MUST be in the foreground during the initial connection to the camera. After the connection is established, it can safely run in the background. You may need to exclude the app from battery optimizations to ensure stable background operation.
+
+## Architecture & Multi-Vendor Support
+
+The project has been refactored to support cameras from multiple manufacturers. It uses a strategy pattern where each vendor provides its own GATT specification and protocol implementation.
+
+For more details on how to add support for new vendors, see [MULTI_VENDOR_SUPPORT.md](MULTI_VENDOR_SUPPORT.md).
 
 ## Setup & Installation
 
@@ -68,7 +77,7 @@ No specific environment variables are required for a standard build. Ensure `JAV
 ## Project Structure
 
 - `app/src/main/kotlin`: Main source code.
-    - `.../ble`: BLE communication logic and Ricoh GATT specifications.
+    - `.../vendors`: Vendor-specific implementations (GATT specs, protocols).
     - `.../data`: Repositories and data sources (Location, Camera, Protobuf).
     - `.../devicesync`: Foreground service and synchronization logic.
     - `.../domain`: Business logic, models, and repository interfaces.

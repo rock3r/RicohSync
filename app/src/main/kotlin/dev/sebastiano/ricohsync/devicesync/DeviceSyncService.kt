@@ -50,7 +50,9 @@ internal class DeviceSyncService : Service(), CoroutineScope {
 
     private val syncCoordinator by lazy {
         SyncCoordinator(
-            cameraRepository = KableCameraRepository(),
+            cameraRepository = KableCameraRepository(
+                vendorRegistry = dev.sebastiano.ricohsync.RicohSyncApp.createVendorRegistry(),
+            ),
             locationRepository = FusedLocationRepository(applicationContext),
             coroutineScope = this,
         )

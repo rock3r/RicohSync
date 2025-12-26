@@ -7,6 +7,7 @@ import dev.sebastiano.ricohsync.domain.model.SyncState
 import dev.sebastiano.ricohsync.domain.repository.CameraConnection
 import dev.sebastiano.ricohsync.domain.repository.CameraRepository
 import dev.sebastiano.ricohsync.domain.repository.LocationRepository
+import dev.sebastiano.ricohsync.vendors.ricoh.RicohCameraVendor
 import io.mockk.coEvery
 import io.mockk.coVerify
 import io.mockk.every
@@ -46,6 +47,7 @@ class SyncCoordinatorTest {
         identifier = "00:11:22:33:44:55",
         name = "GR IIIx",
         macAddress = "00:11:22:33:44:55",
+        vendor = RicohCameraVendor,
     )
 
     private val testLocation = GpsLocation(

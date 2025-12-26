@@ -2,9 +2,9 @@ package dev.sebastiano.ricohsync.devicesync
 
 import android.os.Build
 import android.util.Log
+import dev.sebastiano.ricohsync.domain.model.Camera
 import dev.sebastiano.ricohsync.domain.model.GpsLocation
 import dev.sebastiano.ricohsync.domain.model.LocationSyncInfo
-import dev.sebastiano.ricohsync.domain.model.RicohCamera
 import dev.sebastiano.ricohsync.domain.model.SyncState
 import dev.sebastiano.ricohsync.domain.repository.CameraConnection
 import dev.sebastiano.ricohsync.domain.repository.CameraRepository
@@ -57,7 +57,7 @@ class SyncCoordinator(
      * 5. Enable geo-tagging
      * 6. Continuously sync GPS location
      */
-    fun startSync(camera: RicohCamera) {
+    fun startSync(camera: Camera) {
         if (syncJob != null) {
             Log.w(TAG, "Sync already in progress, ignoring startSync call")
             return
@@ -121,7 +121,7 @@ class SyncCoordinator(
      */
     private suspend fun startLocationSync(
         connection: CameraConnection,
-        camera: RicohCamera,
+        camera: Camera,
         firmwareVersion: String,
     ) {
         locationRepository.startLocationUpdates()
@@ -146,7 +146,7 @@ class SyncCoordinator(
     private suspend fun syncLocationToCamera(
         connection: CameraConnection,
         location: GpsLocation,
-        camera: RicohCamera,
+        camera: Camera,
         firmwareVersion: String,
     ) {
         connection.syncLocation(location)

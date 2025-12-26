@@ -10,7 +10,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationCompat.PRIORITY_HIGH
 import androidx.core.app.NotificationCompat.PRIORITY_LOW
 import dev.sebastiano.ricohsync.R
-import dev.sebastiano.ricohsync.domain.model.RicohCamera
+import dev.sebastiano.ricohsync.domain.model.Camera
 import dev.sebastiano.ricohsync.domain.model.SyncState
 import java.text.DateFormat
 import java.time.ZonedDateTime
@@ -46,7 +46,7 @@ private fun createIdleNotification(context: Context): Notification =
         .setSmallIcon(R.drawable.ic_sync_disabled)
         .build()
 
-private fun createConnectingNotification(context: Context, camera: RicohCamera): Notification =
+private fun createConnectingNotification(context: Context, camera: Camera): Notification =
     NotificationCompat.Builder(context, NOTIFICATION_CHANNEL)
         .setOngoing(true)
         .setPriority(PRIORITY_LOW)
@@ -57,7 +57,7 @@ private fun createConnectingNotification(context: Context, camera: RicohCamera):
         .setSmallIcon(R.drawable.ic_sync_disabled)
         .build()
 
-private fun createReconnectingNotification(context: Context, camera: RicohCamera): Notification =
+private fun createReconnectingNotification(context: Context, camera: Camera): Notification =
     NotificationCompat.Builder(context, NOTIFICATION_CHANNEL)
         .setOngoing(true)
         .setPriority(PRIORITY_LOW)
@@ -70,7 +70,7 @@ private fun createReconnectingNotification(context: Context, camera: RicohCamera
 
 private fun createSyncingNotification(
     context: Context,
-    camera: RicohCamera,
+    camera: Camera,
     lastSyncTime: ZonedDateTime?,
 ): Notification =
     NotificationCompat.Builder(context, NOTIFICATION_CHANNEL)

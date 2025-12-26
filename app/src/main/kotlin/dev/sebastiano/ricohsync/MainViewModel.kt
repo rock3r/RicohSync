@@ -5,9 +5,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.datastore.core.DataStore
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import dev.sebastiano.ricohsync.domain.model.RicohCamera
+import dev.sebastiano.ricohsync.domain.model.Camera
 import dev.sebastiano.ricohsync.proto.SelectedDevice
 import dev.sebastiano.ricohsync.proto.SelectedDevices
+import dev.sebastiano.ricohsync.vendors.ricoh.RicohCameraVendor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOn
@@ -24,7 +25,7 @@ class MainViewModel(private val dataStore: DataStore<SelectedDevices>) : ViewMod
     val mainState: MutableState<MainState> = _mainState
 
     /** Saves the selected device to persistent storage. */
-    fun saveSelectedDevice(camera: RicohCamera) {
+    fun saveSelectedDevice(camera: Camera) {
         viewModelScope.launch(Dispatchers.IO) {
             dataStore.updateData {
                 SelectedDevices.newBuilder()
@@ -54,9 +55,9 @@ class MainViewModel(private val dataStore: DataStore<SelectedDevices>) : ViewMod
 
     private suspend fun updateMainState(selectedDevice: SelectedDevice?) {
         if (selectedDevice != null) {
-            _mainState.value = MainState.FindingDevice(selectedDevice.toRicohCamera())
+            _mainState.value = MainState.FindingDevice(selectedDevice.toCamera())
             // Once the device is found during sync, the DeviceSyncViewModel will handle it
-            _mainState.value = MainState.DeviceFound(selectedDevice.toRicohCamera())
+            _mainState.value = MainState.DeviceFound(selectedDevice.toCamera())
         } else {
             _mainState.value = MainState.NoDeviceSelected
         }
@@ -72,10 +73,17 @@ class MainViewModel(private val dataStore: DataStore<SelectedDevices>) : ViewMod
         onDeviceDisconnected()
     }
 
-    private fun SelectedDevice.toRicohCamera(): RicohCamera = RicohCamera(
+    /**
+     * Converts a stored SelectedDevice to a Camera.
+     *
+     * Note: For backward compatibility, this defaults to Ricoh vendor since the app
+     * was originally Ricoh-only. Future versions could store vendor information.
+     */
+    private fun SelectedDevice.toCamera(): Camera = Camera(
         identifier = macAddress,
         name = name,
         macAddress = macAddress,
+        vendor = RicohCameraVendor, // Default to Ricoh for backward compatibility
     )
 }
 
@@ -91,8 +99,8 @@ sealed interface MainState {
     data object Stopped : MainState
 
     /** Searching for the previously selected device. */
-    data class FindingDevice(val camera: RicohCamera) : MainState
+    data class FindingDevice(val camera: Camera) : MainState
 
     /** Device found, ready to sync. */
-    data class DeviceFound(val camera: RicohCamera) : MainState
+    data class DeviceFound(val camera: Camera) : MainState
 }
