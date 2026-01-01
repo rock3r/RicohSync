@@ -24,6 +24,20 @@ interface PairedDevicesRepository {
     val enabledDevices: Flow<List<PairedDevice>>
 
     /**
+     * Flow of the global sync enabled state. When true, the service can start automatically if
+     * there are enabled devices. When false, the service should only start if explicitly requested
+     * by the user.
+     */
+    val isSyncEnabled: Flow<Boolean>
+
+    /**
+     * Sets the global sync enabled state.
+     *
+     * @param enabled Whether global sync should be enabled.
+     */
+    suspend fun setSyncEnabled(enabled: Boolean)
+
+    /**
      * Adds a newly paired device to persistent storage.
      *
      * @param camera The discovered camera to add.

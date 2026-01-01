@@ -132,10 +132,16 @@ class MultiDeviceSyncService : Service(), CoroutineScope {
         when (intent?.action) {
             ACTION_STOP -> {
                 Log.i(TAG, "Received stop intent, stopping all syncs...")
-                launch { stopAllAndShutdown() }
+                launch {
+                    pairedDevicesRepository.setSyncEnabled(false)
+                    stopAllAndShutdown()
+                }
             }
             ACTION_REFRESH -> {
                 Log.i(TAG, "Received refresh intent, reconnecting to devices...")
+                if (!checkPermissions()) return START_NOT_STICKY
+                startForegroundService()
+                startDeviceMonitoring()
                 launch { refreshConnections() }
             }
             else -> {
@@ -271,6 +277,8 @@ class MultiDeviceSyncService : Service(), CoroutineScope {
     private suspend fun stopAllAndShutdown() {
         syncCoordinator.stopAllDevices()
         _serviceState.value = MultiDeviceSyncServiceState.Stopped
+        ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
+        NotificationManagerCompat.from(this).cancel(NOTIFICATION_ID)
         stopSelf()
     }
 

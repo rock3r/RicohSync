@@ -25,5 +25,9 @@ message PairedDeviceProto {
 message PairedDevicesProto {
   // List of all paired devices
   repeated PairedDeviceProto devices = 1;
+
+  // Whether global synchronization is enabled.
+  // If false, the service won't start automatically.
+  optional bool sync_enabled = 2;
 }
 

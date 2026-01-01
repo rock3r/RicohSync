@@ -24,7 +24,7 @@ This is an Android project built with:
 ## Architecture Overview
 
 ### Data Layer
-- `PairedDevicesRepository`: Interface for managing paired devices (add, remove, enable/disable)
+- `PairedDevicesRepository`: Interface for managing paired devices (add, remove, enable/disable) and global sync state
 - `DataStorePairedDevicesRepository`: Proto-based persistence implementation
 - `CameraRepository`: BLE scanning and connection management
 - `LocationRepository`: GPS location updates from Fused Location Provider
@@ -57,10 +57,11 @@ This is an Android project built with:
 ### Key Features
 1. **Multi-Device Support**: Pair and sync multiple cameras simultaneously.
 2. **Camera Discovery**: Vendor-agnostic BLE device scanning.
-3. **Auto-reconnection**: Automatic reconnection to enabled devices when in range.
+3. **Auto-reconnection**: Automatic reconnection to enabled devices when in range (requires global sync enabled).
 4. **Centralized Location**: Single location collection shared across all connected devices.
 5. **Background Sync**: Maintains synchronization via a Foreground Service.
 6. **GPS & Time Sync**: Real-time location and timestamp synchronization.
+7. **Manual Control**: Notification actions to "Refresh" (restart sync) or "Stop All" (persistent stop).
 
 ### Testing
 - Unit tests use coroutine test dispatchers with `TestScope`

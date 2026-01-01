@@ -115,6 +115,7 @@ fun DevicesListScreen(viewModel: DevicesListViewModel, onAddDeviceClick: () -> U
                     }
                     DevicesList(
                         devices = currentState.devices,
+                        isSyncEnabled = currentState.isSyncEnabled,
                         contentPadding = PaddingValues(0.dp),
                         onDeviceEnabledChange = { device, enabled ->
                             viewModel.setDeviceEnabled(device.device.macAddress, enabled)
@@ -123,6 +124,7 @@ fun DevicesListScreen(viewModel: DevicesListViewModel, onAddDeviceClick: () -> U
                         onRetryClick = { device ->
                             viewModel.retryConnection(device.device.macAddress)
                         },
+                        onRefreshClick = { viewModel.refreshConnections() },
                     )
                 }
             }
@@ -185,10 +187,12 @@ private fun EmptyContent(modifier: Modifier = Modifier, onAddDeviceClick: () -> 
 @Composable
 private fun DevicesList(
     devices: List<PairedDeviceWithState>,
+    isSyncEnabled: Boolean,
     contentPadding: PaddingValues,
     onDeviceEnabledChange: (PairedDeviceWithState, Boolean) -> Unit,
     onUnpairClick: (PairedDeviceWithState) -> Unit,
     onRetryClick: (PairedDeviceWithState) -> Unit,
+    onRefreshClick: () -> Unit,
 ) {
     LazyColumn(
         contentPadding =
@@ -200,6 +204,10 @@ private fun DevicesList(
             ),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        if (!isSyncEnabled) {
+            item { SyncStoppedWarning(onRefreshClick = onRefreshClick) }
+        }
+
         items(devices, key = { it.device.macAddress }) { deviceWithState ->
             DeviceCard(
                 deviceWithState = deviceWithState,
@@ -447,6 +455,41 @@ private fun UnpairConfirmationDialog(
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )
+}
+
+@Composable
+private fun SyncStoppedWarning(onRefreshClick: () -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors =
+            CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.errorContainer,
+                contentColor = MaterialTheme.colorScheme.onErrorContainer,
+            ),
+    ) {
+        Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                Icons.Rounded.BluetoothDisabled,
+                contentDescription = null,
+                modifier = Modifier.size(24.dp),
+            )
+
+            Spacer(Modifier.width(16.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(text = "Searching stopped", style = MaterialTheme.typography.titleSmall)
+                Text(
+                    text = "Tap to resume searching for cameras",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+
+            IconButton(onClick = onRefreshClick) {
+                Icon(Icons.Rounded.Refresh, contentDescription = "Resume searching")
+            }
+        }
+    }
 }
 
 private fun Double.format(decimals: Int): String = "%.${decimals}f".format(this)

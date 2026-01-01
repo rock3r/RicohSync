@@ -31,6 +31,15 @@ class DataStorePairedDevicesRepository(private val dataStore: DataStore<PairedDe
     override val enabledDevices: Flow<List<PairedDevice>> =
         pairedDevices.map { devices -> devices.filter { it.isEnabled } }
 
+    override val isSyncEnabled: Flow<Boolean> =
+        dataStore.data.map { proto -> if (proto.hasSyncEnabled()) proto.syncEnabled else true }
+
+    override suspend fun setSyncEnabled(enabled: Boolean) {
+        dataStore.updateData { currentData ->
+            currentData.toBuilder().setSyncEnabled(enabled).build()
+        }
+    }
+
     override suspend fun addDevice(camera: Camera, enabled: Boolean) {
         dataStore.updateData { currentData ->
             // Check if device already exists

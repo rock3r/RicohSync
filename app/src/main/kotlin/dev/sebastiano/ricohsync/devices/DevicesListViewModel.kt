@@ -18,6 +18,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 private const val TAG = "DevicesListViewModel"
@@ -55,7 +56,8 @@ class DevicesListViewModel(
                     pairedDevicesRepository.pairedDevices,
                     deviceStatesFromService,
                     isScanningFromService,
-                ) { pairedDevices, connectionStates, isScanning ->
+                    pairedDevicesRepository.isSyncEnabled,
+                ) { pairedDevices, connectionStates, isScanning, isSyncEnabled ->
                     if (pairedDevices.isEmpty()) {
                         DevicesListState.Empty
                     } else {
@@ -72,6 +74,7 @@ class DevicesListViewModel(
                                     PairedDeviceWithState(device, connectionState)
                                 },
                             isScanning = isScanning,
+                            isSyncEnabled = isSyncEnabled,
                         )
                     }
                 }
@@ -84,9 +87,12 @@ class DevicesListViewModel(
             val context = bindingContextProvider()
             val intent = Intent(context, MultiDeviceSyncService::class.java)
 
-            // Start the service if there are enabled devices
+            // Start the service if there are enabled devices AND global sync is enabled
             viewModelScope.launch(Dispatchers.IO) {
-                if (pairedDevicesRepository.hasEnabledDevices()) {
+                if (
+                    pairedDevicesRepository.hasEnabledDevices() &&
+                        pairedDevicesRepository.isSyncEnabled.first()
+                ) {
                     context.startService(intent)
                 }
             }
@@ -135,8 +141,9 @@ class DevicesListViewModel(
         viewModelScope.launch(Dispatchers.IO) {
             pairedDevicesRepository.setDeviceEnabled(macAddress, enabled)
 
-            // Start service if we just enabled a device and service isn't running
-            if (enabled && service == null) {
+            // Start service if we just enabled a device, service isn't running, AND global sync is
+            // enabled
+            if (enabled && service == null && pairedDevicesRepository.isSyncEnabled.first()) {
                 val context = bindingContextProvider()
                 context.startService(Intent(context, MultiDeviceSyncService::class.java))
             }
@@ -165,6 +172,7 @@ class DevicesListViewModel(
     /** Manually triggers a scan for all enabled but disconnected devices. */
     fun refreshConnections() {
         viewModelScope.launch(Dispatchers.IO) {
+            pairedDevicesRepository.setSyncEnabled(true)
             val context = bindingContextProvider()
             val intent = MultiDeviceSyncService.createRefreshIntent(context)
             context.startService(intent)
@@ -197,5 +205,6 @@ sealed interface DevicesListState {
     data class HasDevices(
         val devices: List<PairedDeviceWithState>,
         val isScanning: Boolean = false,
+        val isSyncEnabled: Boolean = true,
     ) : DevicesListState
 }

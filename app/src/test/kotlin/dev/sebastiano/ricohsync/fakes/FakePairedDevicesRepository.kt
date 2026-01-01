@@ -18,6 +18,14 @@ class FakePairedDevicesRepository : PairedDevicesRepository {
     override val enabledDevices: Flow<List<PairedDevice>> =
         _devices.map { devices -> devices.filter { it.isEnabled } }
 
+    private val _isSyncEnabled = MutableStateFlow(true)
+
+    override val isSyncEnabled: Flow<Boolean> = _isSyncEnabled
+
+    override suspend fun setSyncEnabled(enabled: Boolean) {
+        _isSyncEnabled.value = enabled
+    }
+
     // Tracking for test verification
     var addDeviceCalled = false
         private set

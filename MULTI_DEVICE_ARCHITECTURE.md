@@ -68,10 +68,12 @@ Manages the persistent storage of paired devices.
 interface PairedDevicesRepository {
     val pairedDevices: Flow<List<PairedDevice>>
     val enabledDevices: Flow<List<PairedDevice>>
+    val isSyncEnabled: Flow<Boolean>
     
     suspend fun addDevice(camera: Camera, enabled: Boolean = true)
     suspend fun removeDevice(macAddress: String)
     suspend fun setDeviceEnabled(macAddress: String, enabled: Boolean)
+    suspend fun setSyncEnabled(enabled: Boolean)
     suspend fun isDevicePaired(macAddress: String): Boolean
     // ... more methods
 }
@@ -90,6 +92,7 @@ message PairedDeviceProto {
 
 message PairedDevicesProto {
   repeated PairedDeviceProto devices = 1;
+  optional bool sync_enabled = 2;
 }
 ```
 
@@ -154,12 +157,15 @@ Android Foreground Service managing the sync lifecycle.
 - Observes `PairedDevicesRepository.enabledDevices`
 - Starts/stops device connections based on enabled state
 - Updates notification with connection count and sync status
-- Handles notification actions (Refresh, Stop All)
+- Handles notification actions:
+  - **Refresh**: Sets global `sync_enabled` to true, restarts service, and retries all connections
+  - **Stop All**: Disconnects all devices, sets global `sync_enabled` to false, removes notification, and stops service
 
 **Lifecycle:**
-1. Service starts when there are enabled devices
-2. Service stops when all devices are disabled or removed
-3. Auto-connects to enabled devices when they come into range
+1. Service starts when there are enabled devices AND global `sync_enabled` is true
+2. Service stops when all devices are disabled/removed OR "Stop All" is clicked
+3. Auto-reconnection only occurs when global `sync_enabled` is true
+4. Manual refresh via UI or notification restarts the service regardless of current state
 
 ## Data Flow
 
@@ -174,13 +180,47 @@ PairingViewModel.pairDevice(camera)
 PairedDevicesRepository.addDevice(camera, enabled=true)
         │
         ▼
-MultiDeviceSyncService observes enabledDevices
+MultiDeviceSyncService observes enabledDevices (if sync_enabled=true)
         │
         ▼
 MultiDeviceSyncCoordinator.startDeviceSync(device)
         │
         ▼
 Device connects → Initial setup → Register for location
+```
+
+### Stop All Sync
+```
+User clicks "Stop all" in Notification
+        │
+        ▼
+MultiDeviceSyncService.onStartCommand(ACTION_STOP)
+        │
+        ▼
+PairedDevicesRepository.setSyncEnabled(false)
+        │
+        ▼
+MultiDeviceSyncCoordinator.stopAllDevices()
+        │
+        ▼
+stopForeground(REMOVE) & stopSelf()
+```
+
+### Manual Refresh / Restart
+```
+User clicks "Refresh" in UI or Notification
+        │
+        ▼
+DevicesListViewModel.refreshConnections() / ACTION_REFRESH
+        │
+        ▼
+PairedDevicesRepository.setSyncEnabled(true)
+        │
+        ▼
+context.startService(ACTION_REFRESH)
+        │
+        ▼
+Service starts/resumes → startForegroundService() → refreshConnections()
 ```
 
 ### Location Sync
@@ -210,6 +250,9 @@ DevicesListViewModel.setDeviceEnabled(mac, enabled)
         │
         ▼
 PairedDevicesRepository.setDeviceEnabled(mac, enabled)
+        │
+        ▼
+If (enabled AND sync_enabled) -> context.startService()
         │
         ▼
 MultiDeviceSyncService observes change
