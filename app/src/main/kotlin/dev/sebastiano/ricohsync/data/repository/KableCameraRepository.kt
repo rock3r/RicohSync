@@ -40,12 +40,9 @@ class KableCameraRepository(
         Log.i(TAG, "Scan filter UUIDs: $scanFilterUuids")
 
         com.juul.kable.Scanner {
-            filters {
-                // Add a filter for each vendor's scan service UUIDs
-                scanFilterUuids.forEach { uuid ->
-                    match { services = listOf(uuid) }
-                }
-            }
+            // We don't use filters here because some cameras might not advertise
+            // the service UUID in the advertisement packet.
+            // We filter discovered devices in discoveredCameras instead.
             logging {
                 engine = SystemLogEngine
                 level = Logging.Level.Events

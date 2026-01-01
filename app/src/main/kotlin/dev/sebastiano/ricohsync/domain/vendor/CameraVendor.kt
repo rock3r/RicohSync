@@ -59,6 +59,9 @@ interface CameraGattSpec {
     /** Service UUID(s) used for scanning and filtering camera advertisements. */
     val scanFilterServiceUuids: List<Uuid>
 
+    /** Device name prefix(es) used for scanning and filtering camera advertisements. */
+    val scanFilterDeviceNames: List<String> get() = emptyList()
+
     /** Firmware version service UUID, or null if not supported. */
     val firmwareServiceUuid: Uuid?
 

@@ -50,11 +50,9 @@ class PairingViewModel(
 
     @OptIn(ObsoleteKableApi::class)
     private val scanner = Scanner {
-        filters {
-            vendorRegistry.getAllScanFilterUuids().forEach { uuid ->
-                match { services = listOf(uuid) }
-            }
-        }
+        // We don't use filters here because some cameras might not advertise
+        // the service UUID in the advertisement packet.
+        // We filter discovered devices in onDiscovery instead.
         logging {
             engine = SystemLogEngine
             level = Logging.Level.Events
@@ -92,6 +90,11 @@ class PairingViewModel(
     fun stopScanning() {
         scanJob?.cancel("Stopping scan")
         scanJob = null
+
+        val currentState = _state.value
+        if (currentState is PairingScreenState.Scanning) {
+            _state.value = currentState.copy(isScanning = false)
+        }
     }
 
     private suspend fun onDiscovery(advertisement: PlatformAdvertisement) {
@@ -190,6 +193,7 @@ sealed interface PairingScreenState {
     /** Actively scanning for cameras. */
     data class Scanning(
         val discoveredDevices: List<Camera>,
+        val isScanning: Boolean = true,
     ) : PairingScreenState
 
     /** Pairing with a selected camera. */

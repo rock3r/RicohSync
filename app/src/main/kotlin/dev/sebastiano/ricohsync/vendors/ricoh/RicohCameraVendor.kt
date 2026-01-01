@@ -32,14 +32,15 @@ object RicohCameraVendor : CameraVendor {
             RicohGattSpec.scanFilterServiceUuids.contains(uuid)
         }
 
-        // Additional check: device name typically starts with "GR" for Ricoh GR cameras
-        // (e.g., "GR3", "GR3X", etc.)
-        // This is optional and may need adjustment for other Ricoh camera models
-        val hasRicohName = deviceName?.startsWith("GR", ignoreCase = true) ?: false
+        // Additional check: device name typically starts with "GR" or "RICOH"
+        val hasRicohName = deviceName?.let { name ->
+            RicohGattSpec.scanFilterDeviceNames.any { prefix ->
+                name.startsWith(prefix, ignoreCase = true)
+            }
+        } ?: false
 
-        // Accept device if it has the Ricoh service UUID
-        // Device name check is informational but not required
-        return hasRicohService
+        // Accept device if it has the Ricoh service UUID or a recognized name
+        return hasRicohService || hasRicohName
     }
 
     override fun getCapabilities(): CameraCapabilities {

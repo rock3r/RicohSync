@@ -38,6 +38,13 @@ interface CameraVendorRegistry {
      * This is useful for configuring BLE scanners to discover all supported cameras.
      */
     fun getAllScanFilterUuids(): List<Uuid>
+
+    /**
+     * Returns all scan filter device name prefixes from all registered vendors.
+     *
+     * This is useful for configuring BLE scanners to discover all supported cameras.
+     */
+    fun getAllScanFilterDeviceNames(): List<String>
 }
 
 /**
@@ -65,5 +72,9 @@ class DefaultCameraVendorRegistry(
 
     override fun getAllScanFilterUuids(): List<Uuid> {
         return vendors.flatMap { it.gattSpec.scanFilterServiceUuids }.distinct()
+    }
+
+    override fun getAllScanFilterDeviceNames(): List<String> {
+        return vendors.flatMap { it.gattSpec.scanFilterDeviceNames }.distinct()
     }
 }

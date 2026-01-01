@@ -46,12 +46,7 @@ internal class ScanningViewModel : ViewModel() {
 
     @OptIn(ObsoleteKableApi::class)
     private val scanner = Scanner {
-        filters {
-            // Scan for all supported camera vendors
-            vendorRegistry.getAllScanFilterUuids().forEach { uuid ->
-                match { services = listOf(uuid) }
-            }
-        }
+        // No filters to allow all devices and filter in onDiscovery
         logging {
             engine = SystemLogEngine
             level = Logging.Level.Events

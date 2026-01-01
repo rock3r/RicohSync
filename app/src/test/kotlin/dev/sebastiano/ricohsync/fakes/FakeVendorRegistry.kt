@@ -32,6 +32,10 @@ class FakeVendorRegistry : CameraVendorRegistry {
         return vendors.flatMap { it.gattSpec.scanFilterServiceUuids }.distinct()
     }
 
+    override fun getAllScanFilterDeviceNames(): List<String> {
+        return vendors.flatMap { it.gattSpec.scanFilterDeviceNames }.distinct()
+    }
+
     fun addVendor(vendor: CameraVendor) {
         vendors.add(vendor)
     }

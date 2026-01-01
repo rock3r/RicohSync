@@ -93,7 +93,7 @@ fun PairingScreen(
             )
         },
         floatingActionButton = {
-            val isScanning = currentState is PairingScreenState.Scanning
+            val isScanning = (currentState as? PairingScreenState.Scanning)?.isScanning == true
             FloatingActionButton(
                 onClick = {
                     if (isScanning) viewModel.stopScanning() else viewModel.startScanning()
@@ -118,6 +118,7 @@ fun PairingScreen(
                 ScanningContent(
                     modifier = Modifier.padding(innerPadding),
                     discoveredDevices = currentState.discoveredDevices,
+                    isScanning = currentState.isScanning,
                     onDeviceClick = { camera ->
                         viewModel.pairDevice(camera)
                     },
@@ -192,39 +193,42 @@ private fun IdleContent(
 private fun ScanningContent(
     modifier: Modifier = Modifier,
     discoveredDevices: List<Camera>,
+    isScanning: Boolean,
     onDeviceClick: (Camera) -> Unit,
 ) {
     Column(modifier = modifier.fillMaxSize()) {
         // Scanning indicator
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f))
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            val infiniteTransition = rememberInfiniteTransition(label = "scan_animation")
-            val rotation by infiniteTransition.animateFloat(
-                initialValue = 0f,
-                targetValue = 360f,
-                animationSpec = infiniteRepeatable(tween(2000)),
-                label = "rotation",
-            )
+        if (isScanning) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f))
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                val infiniteTransition = rememberInfiniteTransition(label = "scan_animation")
+                val rotation by infiniteTransition.animateFloat(
+                    initialValue = 0f,
+                    targetValue = 360f,
+                    animationSpec = infiniteRepeatable(tween(2000)),
+                    label = "rotation",
+                )
 
-            Icon(
-                Icons.Rounded.Bluetooth,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.rotate(rotation),
-            )
+                Icon(
+                    Icons.Rounded.Bluetooth,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.rotate(rotation),
+                )
 
-            Spacer(Modifier.width(12.dp))
+                Spacer(Modifier.width(12.dp))
 
-            Text(
-                "Scanning for cameras...",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.primary,
-            )
+                Text(
+                    "Scanning for cameras...",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
         }
 
         if (discoveredDevices.isEmpty()) {

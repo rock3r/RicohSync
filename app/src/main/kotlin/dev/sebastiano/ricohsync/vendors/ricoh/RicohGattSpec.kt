@@ -21,6 +21,8 @@ object RicohGattSpec : CameraGattSpec {
 
     override val scanFilterServiceUuids: List<Uuid> = listOf(SCAN_FILTER_SERVICE_UUID)
 
+    override val scanFilterDeviceNames: List<String> = listOf("GR", "RICOH")
+
     /** Firmware version service and characteristic. */
     object Firmware {
         val SERVICE_UUID: Uuid = Uuid.parse("9a5ed1c5-74cc-4c50-b5b6-66a48e7ccff1")
