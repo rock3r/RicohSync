@@ -80,6 +80,7 @@ class FusedLocationRepository(
             latitude = latitude,
             longitude = longitude,
             altitude = altitude,
+            accuracy = accuracy,
             timestamp = ZonedDateTime.ofInstant(Instant.ofEpochMilli(time), ZoneId.of("UTC")),
         )
 

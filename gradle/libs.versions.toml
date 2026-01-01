@@ -12,9 +12,11 @@ junitVersion = "1.3.0"
 kable = "0.41.0"
 ktfmt = "0.25.0"
 kotlin = "2.3.0"
-    lifecycleRuntimeKtx = "2.10.0"
-    lifecycleProcess = "2.10.0"
-    mockk = "1.14.7"
+lifecycleRuntimeKtx = "2.10.0"
+lifecycleProcess = "2.10.0"
+maplibre = "0.12.1"
+maplibre-spatialk = "0.6.0"
+mockk = "1.14.7"
 protobufPlugin = "0.9.6"
 protobuf = "4.33.2"
 playServicesLocation = "21.3.0"
@@ -42,6 +44,9 @@ kable = { module = "com.juul.kable:kable-core", version.ref = "kable" }
 kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "coroutinesTest" }
 mockk = { group = "io.mockk", name = "mockk", version.ref = "mockk" }
 play-services-location = { group = "com.google.android.gms", name = "play-services-location", version.ref = "playServicesLocation" }
+maplibre-core = { module = "org.maplibre.compose:maplibre-compose-android", version.ref = "maplibre" }
+maplibre-material3 = { module = "org.maplibre.compose:maplibre-compose-material3-android", version.ref = "maplibre" }
+maplibre-spatialk = { module = "org.maplibre.spatialk:geojson", version.ref = "maplibre-spatialk" }
 protobuf-kotlin-lite = { group = "com.google.protobuf", name = "protobuf-kotlin-lite", version.ref = "protobuf" }
 protobuf-protoc = { group = "com.google.protobuf", name = "protoc", version.ref = "protobuf" }
 

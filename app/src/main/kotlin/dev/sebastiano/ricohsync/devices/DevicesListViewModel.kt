@@ -12,7 +12,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.sebastiano.ricohsync.devicesync.MultiDeviceSyncService
 import dev.sebastiano.ricohsync.domain.model.DeviceConnectionState
+import dev.sebastiano.ricohsync.domain.model.GpsLocation
 import dev.sebastiano.ricohsync.domain.model.PairedDeviceWithState
+import dev.sebastiano.ricohsync.domain.repository.LocationRepository
 import dev.sebastiano.ricohsync.domain.repository.PairedDevicesRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -31,6 +33,7 @@ private const val TAG = "DevicesListViewModel"
  */
 class DevicesListViewModel(
     private val pairedDevicesRepository: PairedDevicesRepository,
+    private val locationRepository: LocationRepository,
     private val bindingContextProvider: () -> Context,
 ) : ViewModel() {
 
@@ -48,6 +51,7 @@ class DevicesListViewModel(
     init {
         observeDevices()
         bindToService()
+        locationRepository.startLocationUpdates()
     }
 
     private fun observeDevices() {
@@ -57,7 +61,8 @@ class DevicesListViewModel(
                     deviceStatesFromService,
                     isScanningFromService,
                     pairedDevicesRepository.isSyncEnabled,
-                ) { pairedDevices, connectionStates, isScanning, isSyncEnabled ->
+                    locationRepository.locationUpdates,
+                ) { pairedDevices, connectionStates, isScanning, isSyncEnabled, currentLocation ->
                     if (pairedDevices.isEmpty()) {
                         DevicesListState.Empty
                     } else {
@@ -75,6 +80,7 @@ class DevicesListViewModel(
                                 },
                             isScanning = isScanning,
                             isSyncEnabled = isSyncEnabled,
+                            currentLocation = currentLocation,
                         )
                     }
                 }
@@ -181,6 +187,7 @@ class DevicesListViewModel(
 
     override fun onCleared() {
         super.onCleared()
+        locationRepository.stopLocationUpdates()
         stateCollectionJob?.cancel()
         scanningCollectionJob?.cancel()
         serviceConnection?.let { connection ->
@@ -206,5 +213,6 @@ sealed interface DevicesListState {
         val devices: List<PairedDeviceWithState>,
         val isScanning: Boolean = false,
         val isSyncEnabled: Boolean = true,
+        val currentLocation: GpsLocation? = null,
     ) : DevicesListState
 }

@@ -21,10 +21,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import dev.sebastiano.ricohsync.data.repository.DataStorePairedDevicesRepository
+import dev.sebastiano.ricohsync.data.repository.FusedLocationRepository
 import dev.sebastiano.ricohsync.data.repository.pairedDevicesDataStoreV2
 import dev.sebastiano.ricohsync.devices.DevicesListScreen
 import dev.sebastiano.ricohsync.devices.DevicesListViewModel
 import dev.sebastiano.ricohsync.devicesync.registerNotificationChannel
+import dev.sebastiano.ricohsync.domain.repository.LocationRepository
 import dev.sebastiano.ricohsync.pairing.PairingScreen
 import dev.sebastiano.ricohsync.pairing.PairingViewModel
 import dev.sebastiano.ricohsync.ui.theme.RicohSyncTheme
@@ -37,12 +39,14 @@ class MainActivity : ComponentActivity() {
         registerNotificationChannel(this)
 
         val pairedDevicesRepository = DataStorePairedDevicesRepository(pairedDevicesDataStoreV2)
+        val locationRepository = FusedLocationRepository(applicationContext)
         val viewModel = MainViewModel(pairedDevicesRepository)
 
         setContent {
             RootComposable(
                 viewModel = viewModel,
                 pairedDevicesRepository = pairedDevicesRepository,
+                locationRepository = locationRepository,
                 context = this,
             )
         }
@@ -53,6 +57,7 @@ class MainActivity : ComponentActivity() {
 private fun RootComposable(
     viewModel: MainViewModel,
     pairedDevicesRepository: DataStorePairedDevicesRepository,
+    locationRepository: LocationRepository,
     context: Context,
 ) {
     RicohSyncTheme {
@@ -67,6 +72,7 @@ private fun RootComposable(
                 val devicesListViewModel = remember {
                     DevicesListViewModel(
                         pairedDevicesRepository = pairedDevicesRepository,
+                        locationRepository = locationRepository,
                         bindingContextProvider = { context.applicationContext },
                     )
                 }

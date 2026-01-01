@@ -12,6 +12,7 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -42,6 +43,7 @@ import androidx.compose.material.icons.rounded.Sync
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -54,6 +56,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -67,7 +70,13 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.sebastiano.ricohsync.devicesync.formatElapsedTimeSince
 import dev.sebastiano.ricohsync.domain.model.DeviceConnectionState
+import dev.sebastiano.ricohsync.domain.model.GpsLocation
 import dev.sebastiano.ricohsync.domain.model.PairedDeviceWithState
+import org.maplibre.compose.camera.CameraPosition
+import org.maplibre.compose.camera.rememberCameraState
+import org.maplibre.compose.map.MaplibreMap
+import org.maplibre.compose.style.BaseStyle
+import org.maplibre.spatialk.geojson.Position
 
 /** Main screen showing the list of paired devices with their sync status. */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -109,14 +118,28 @@ fun DevicesListScreen(viewModel: DevicesListViewModel, onAddDeviceClick: () -> U
             }
 
             is DevicesListState.HasDevices -> {
-                Column(modifier = Modifier.padding(innerPadding)) {
+                Column(
+                    modifier = Modifier.padding(innerPadding),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
                     if (currentState.isScanning) {
                         LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                     }
+
+                    LocationCard(
+                        location = currentState.currentLocation,
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                    )
+
+                    if (!currentState.isSyncEnabled) {
+                        SyncStoppedWarning(
+                            onRefreshClick = { viewModel.refreshConnections() },
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                        )
+                    }
+
                     DevicesList(
                         devices = currentState.devices,
-                        isSyncEnabled = currentState.isSyncEnabled,
-                        contentPadding = PaddingValues(0.dp),
                         onDeviceEnabledChange = { device, enabled ->
                             viewModel.setDeviceEnabled(device.device.macAddress, enabled)
                         },
@@ -124,7 +147,6 @@ fun DevicesListScreen(viewModel: DevicesListViewModel, onAddDeviceClick: () -> U
                         onRetryClick = { device ->
                             viewModel.retryConnection(device.device.macAddress)
                         },
-                        onRefreshClick = { viewModel.refreshConnections() },
                     )
                 }
             }
@@ -187,27 +209,22 @@ private fun EmptyContent(modifier: Modifier = Modifier, onAddDeviceClick: () -> 
 @Composable
 private fun DevicesList(
     devices: List<PairedDeviceWithState>,
-    isSyncEnabled: Boolean,
-    contentPadding: PaddingValues,
     onDeviceEnabledChange: (PairedDeviceWithState, Boolean) -> Unit,
     onUnpairClick: (PairedDeviceWithState) -> Unit,
     onRetryClick: (PairedDeviceWithState) -> Unit,
-    onRefreshClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     LazyColumn(
+        modifier = modifier.fillMaxSize(),
         contentPadding =
             PaddingValues(
                 start = 16.dp,
+                top = 8.dp,
                 end = 16.dp,
-                top = contentPadding.calculateTopPadding() + 8.dp,
-                bottom = contentPadding.calculateBottomPadding() + 80.dp, // Room for FAB
+                bottom = 80.dp, // Room for FAB
             ),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        if (!isSyncEnabled) {
-            item { SyncStoppedWarning(onRefreshClick = onRefreshClick) }
-        }
-
         items(devices, key = { it.device.macAddress }) { deviceWithState ->
             DeviceCard(
                 deviceWithState = deviceWithState,
@@ -263,8 +280,7 @@ private fun DeviceCard(
 
                         if (device.lastSyncedAt != null) {
                             Text(
-                                text =
-                                    " • Last synced ${formatElapsedTimeSince(device.lastSyncedAt)}",
+                                text = " • ${formatElapsedTimeSince(device.lastSyncedAt)}",
                                 style = MaterialTheme.typography.bodySmall,
                                 color =
                                     MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
@@ -309,12 +325,6 @@ private fun DeviceCard(
                     if (connectionState is DeviceConnectionState.Syncing) {
                         connectionState.firmwareVersion?.let { version ->
                             DeviceDetailRow("Firmware", version)
-                        }
-                        connectionState.lastSyncInfo?.let { syncInfo ->
-                            DeviceDetailRow(
-                                "Location",
-                                "${syncInfo.location.latitude.format(4)}, ${syncInfo.location.longitude.format(4)}",
-                            )
                         }
                     }
 
@@ -458,7 +468,7 @@ private fun UnpairConfirmationDialog(
 }
 
 @Composable
-private fun SyncStoppedWarning(onRefreshClick: () -> Unit) {
+private fun SyncStoppedWarning(onRefreshClick: () -> Unit, modifier: Modifier = Modifier) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
@@ -487,6 +497,59 @@ private fun SyncStoppedWarning(onRefreshClick: () -> Unit) {
 
             IconButton(onClick = onRefreshClick) {
                 Icon(Icons.Rounded.Refresh, contentDescription = "Resume searching")
+            }
+        }
+    }
+}
+
+@Composable
+private fun LocationCard(location: GpsLocation?, modifier: Modifier = Modifier) {
+    Card(
+        modifier = Modifier.fillMaxWidth().height(200.dp),
+        shape = RoundedCornerShape(16.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+    ) {
+        if (location == null) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    CircularProgressIndicator(modifier = Modifier.size(32.dp))
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "Acquiring location...",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        } else {
+            val isDarkTheme = isSystemInDarkTheme()
+            val mapStyle =
+                if (isDarkTheme) "https://tiles.openfreemap.org/styles/dark"
+                else "https://tiles.openfreemap.org/styles/positron"
+
+            val cameraState =
+                rememberCameraState(
+                    CameraPosition(
+                        target = Position(location.longitude, location.latitude),
+                        zoom = 14.0,
+                    )
+                )
+
+            // Update camera when location changes
+            LaunchedEffect(location) {
+                cameraState.position =
+                    CameraPosition(
+                        target = Position(location.longitude, location.latitude),
+                        zoom = cameraState.position.zoom, // Keep current zoom
+                    )
+            }
+
+            MaplibreMap(
+                modifier = Modifier.fillMaxSize(),
+                baseStyle = BaseStyle.Uri(mapStyle),
+                cameraState = cameraState,
+            ) {
+                // Blue dot and accuracy circle omitted for now to ensure compilation
             }
         }
     }

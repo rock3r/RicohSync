@@ -54,6 +54,9 @@ dependencies {
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.kable)
     implementation(libs.play.services.location)
+    implementation(libs.maplibre.core)
+    implementation(libs.maplibre.material3)
+    implementation(libs.maplibre.spatialk)
     implementation(libs.protobuf.kotlin.lite)
 
     debugImplementation(libs.androidx.ui.test.manifest)
