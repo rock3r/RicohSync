@@ -3,6 +3,7 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.protobuf)
+    alias(libs.plugins.ktfmt)
 }
 
 android {
@@ -31,6 +32,13 @@ android {
         targetCompatibility = JavaVersion.VERSION_11
     }
     buildFeatures { compose = true }
+    adbOptions {
+        installOptions("--user", "0")
+    }
+}
+
+ktfmt {
+    kotlinLangStyle()
 }
 
 kotlin {
