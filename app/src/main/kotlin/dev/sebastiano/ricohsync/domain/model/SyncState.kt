@@ -26,7 +26,4 @@ sealed interface SyncState {
 }
 
 /** Information about the last successful location sync. */
-data class LocationSyncInfo(
-    val syncTime: ZonedDateTime,
-    val location: GpsLocation,
-)
+data class LocationSyncInfo(val syncTime: ZonedDateTime, val location: GpsLocation)

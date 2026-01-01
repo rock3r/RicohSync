@@ -16,6 +16,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
@@ -85,6 +86,7 @@ class SyncCoordinator(
             } catch (e: Exception) {
                 Log.e(TAG, "Sync error", e)
                 _state.value = SyncState.Disconnected(camera)
+            } finally {
                 currentConnection?.disconnect()
                 currentConnection = null
                 syncJob = null
@@ -126,6 +128,14 @@ class SyncCoordinator(
     ) {
         locationRepository.startLocationUpdates()
 
+        val connectionMonitoringJob = coroutineScope.launch {
+            connection.isConnected
+                .filter { !it }
+                .first()
+            Log.i(TAG, "Connection lost for ${camera.macAddress}")
+            syncJob?.cancel(CancellationException("Connection lost"))
+        }
+
         try {
             locationRepository.locationUpdates
                 .filterNotNull()
@@ -139,6 +149,7 @@ class SyncCoordinator(
             }
             throw e
         } finally {
+            connectionMonitoringJob.cancel()
             locationRepository.stopLocationUpdates()
         }
     }

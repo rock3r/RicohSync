@@ -3,22 +3,21 @@ package dev.sebastiano.ricohsync.devicesync
 import android.util.Log
 import dev.sebastiano.ricohsync.domain.model.GpsLocation
 import dev.sebastiano.ricohsync.domain.repository.LocationRepository
+import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import java.util.concurrent.ConcurrentHashMap
 
 private const val TAG = "LocationCollector"
 
 /**
  * Default implementation of [LocationCollectionCoordinator].
  *
- * Manages location collection lifecycle based on registered devices.
- * Location updates are collected from a [LocationRepository] and exposed
- * to all registered consumers.
+ * Manages location collection lifecycle based on registered devices. Location updates are collected
+ * from a [LocationRepository] and exposed to all registered consumers.
  *
  * @param locationRepository The repository providing location updates.
  * @param coroutineScope Scope for launching collection coroutines.
@@ -47,14 +46,15 @@ class DefaultLocationCollector(
         _isCollecting.value = true
         locationRepository.startLocationUpdates()
 
-        collectionJob = coroutineScope.launch {
-            locationRepository.locationUpdates.collect { location ->
-                _locationUpdates.value = location
-                if (location != null) {
-                    Log.d(TAG, "New location: ${location.latitude}, ${location.longitude}")
+        collectionJob =
+            coroutineScope.launch {
+                locationRepository.locationUpdates.collect { location ->
+                    _locationUpdates.value = location
+                    if (location != null) {
+                        Log.d(TAG, "New location: ${location.latitude}, ${location.longitude}")
+                    }
                 }
             }
-        }
     }
 
     override fun stopCollecting() {
@@ -86,4 +86,3 @@ class DefaultLocationCollector(
 
     override fun getRegisteredDeviceCount(): Int = registeredDevices.size
 }
-

@@ -48,6 +48,9 @@ interface CameraConnection {
     /** The camera this connection is for. */
     val camera: Camera
 
+    /** Flow of the connection state. Emits true when connected, false when disconnected. */
+    val isConnected: Flow<Boolean>
+
     /** Reads the camera's firmware version. */
     suspend fun readFirmwareVersion(): String
 

@@ -57,41 +57,41 @@ internal class DeviceSyncViewModel(
             val intent = Intent(context, DeviceSyncService::class.java)
             context.startService(intent)
 
-            val connection = object : ServiceConnection {
-                override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
-                    serviceBinder.value = service as DeviceSyncService.DeviceSyncServiceBinder
-                }
+            val connection =
+                object : ServiceConnection {
+                    override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
+                        serviceBinder.value = service as DeviceSyncService.DeviceSyncServiceBinder
+                    }
 
-                override fun onServiceDisconnected(name: ComponentName?) {
-                    serviceBinder.value = null
+                    override fun onServiceDisconnected(name: ComponentName?) {
+                        serviceBinder.value = null
+                    }
                 }
-            }
             context.bindService(intent, connection, 0)
         }
     }
 
     private fun onBound(binder: DeviceSyncService.DeviceSyncServiceBinder) {
-        collectJob = viewModelScope.launch(Dispatchers.Default) {
-            try {
-                val service = DeviceSyncService.getInstanceFrom(binder)
-                service.connectAndSync(camera)
-                service.state.collect { deviceSyncState ->
-                    _state.value = deviceSyncState
-                    if (deviceSyncState is DeviceSyncState.Disconnected) {
-                        onDeviceDisconnected(deviceSyncState.camera)
+        collectJob =
+            viewModelScope.launch(Dispatchers.Default) {
+                try {
+                    val service = DeviceSyncService.getInstanceFrom(binder)
+                    service.connectAndSync(camera)
+                    service.state.collect { deviceSyncState ->
+                        _state.value = deviceSyncState
+                        if (deviceSyncState is DeviceSyncState.Disconnected) {
+                            onDeviceDisconnected(deviceSyncState.camera)
+                        }
                     }
+                } catch (e: DeadObjectException) {
+                    onUnbound()
                 }
-            } catch (e: DeadObjectException) {
-                onUnbound()
             }
-        }
     }
 
     /** Stops syncing and disconnects from the camera. */
     fun stopSyncAndDisconnect() {
-        viewModelScope.launch {
-            serviceBinder.value?.getService()?.stopAndDisconnect()
-        }
+        viewModelScope.launch { serviceBinder.value?.getService()?.stopAndDisconnect() }
     }
 
     private fun onUnbound() {

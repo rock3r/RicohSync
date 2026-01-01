@@ -35,7 +35,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 private const val TAG = "MultiDeviceSyncService"
@@ -50,8 +49,8 @@ private const val TAG = "MultiDeviceSyncService"
  * - Automatic reconnection attempts
  * - Notifications showing sync status
  *
- * The service starts automatically when there are enabled paired devices
- * and stops when all devices are disabled or disconnected.
+ * The service starts automatically when there are enabled paired devices and stops when all devices
+ * are disabled or disconnected.
  */
 class MultiDeviceSyncService : Service(), CoroutineScope {
 
@@ -70,15 +69,10 @@ class MultiDeviceSyncService : Service(), CoroutineScope {
     }
 
     private val locationCollector by lazy {
-        DefaultLocationCollector(
-            locationRepository = locationRepository,
-            coroutineScope = this,
-        )
+        DefaultLocationCollector(locationRepository = locationRepository, coroutineScope = this)
     }
 
-    private val cameraRepository by lazy {
-        KableCameraRepository(vendorRegistry = vendorRegistry)
-    }
+    private val cameraRepository by lazy { KableCameraRepository(vendorRegistry = vendorRegistry) }
 
     private val pairedDevicesRepository: PairedDevicesRepository by lazy {
         DataStorePairedDevicesRepository(applicationContext.pairedDevicesDataStoreV2)
@@ -92,12 +86,11 @@ class MultiDeviceSyncService : Service(), CoroutineScope {
             coroutineScope = this,
         )
     }
-    
+
     private val vibrator by lazy { SyncErrorVibrator(applicationContext) }
 
-    private val _serviceState = MutableStateFlow<MultiDeviceSyncServiceState>(
-        MultiDeviceSyncServiceState.Starting
-    )
+    private val _serviceState =
+        MutableStateFlow<MultiDeviceSyncServiceState>(MultiDeviceSyncServiceState.Starting)
 
     /** The current state of the sync service. */
     val serviceState: StateFlow<MultiDeviceSyncServiceState> = _serviceState.asStateFlow()
@@ -106,17 +99,25 @@ class MultiDeviceSyncService : Service(), CoroutineScope {
     val deviceStates: StateFlow<Map<String, DeviceConnectionState>>
         get() = syncCoordinator.deviceStates
 
+    /** Flow that emits true when a scan/discovery pass is in progress. */
+    val isScanning: StateFlow<Boolean>
+        get() = syncCoordinator.isScanning
+
     private var stateCollectionJob: Job? = null
     private var deviceMonitorJob: Job? = null
 
     override fun onCreate() {
         super.onCreate()
-        ProcessLifecycleOwner.get().lifecycle.addObserver(object : DefaultLifecycleObserver {
-            override fun onStart(owner: LifecycleOwner) {
-                Log.d(TAG, "App brought to foreground, stopping vibration")
-                vibrator.stop()
-            }
-        })
+        ProcessLifecycleOwner.get()
+            .lifecycle
+            .addObserver(
+                object : DefaultLifecycleObserver {
+                    override fun onStart(owner: LifecycleOwner) {
+                        Log.d(TAG, "App brought to foreground, stopping vibration")
+                        vibrator.stop()
+                    }
+                }
+            )
     }
 
     override fun onBind(intent: Intent): IBinder {
@@ -159,130 +160,90 @@ class MultiDeviceSyncService : Service(), CoroutineScope {
                 ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE or
                     ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION,
             )
-            _serviceState.value = MultiDeviceSyncServiceState.Running(
-                connectedDeviceCount = 0,
-                enabledDeviceCount = 0,
-            )
+            _serviceState.value =
+                MultiDeviceSyncServiceState.Running(
+                    connectedDeviceCount = 0,
+                    enabledDeviceCount = 0,
+                )
         } catch (e: Exception) {
             if (e is ForegroundServiceStartNotAllowedException) {
                 Log.e(TAG, "Cannot start foreground service", e)
             }
-            _serviceState.value = MultiDeviceSyncServiceState.Error(
-                "Failed to start service: ${e.message}"
-            )
+            _serviceState.value =
+                MultiDeviceSyncServiceState.Error("Failed to start service: ${e.message}")
             vibrator.vibrate()
         }
     }
 
-    /**
-     * Starts monitoring enabled devices and connecting to them.
-     */
+    /** Starts monitoring enabled devices and connecting to them. */
     private fun startDeviceMonitoring() {
         if (deviceMonitorJob != null) return
 
+        // Start background monitoring in the coordinator
+        syncCoordinator.startBackgroundMonitoring(pairedDevicesRepository.enabledDevices)
+
+        // Still need to monitor enabled devices here to stop service when none are enabled
         deviceMonitorJob = launch {
-            // Observe enabled devices and connect to them
             pairedDevicesRepository.enabledDevices.collect { enabledDevices ->
-                handleEnabledDevicesChanged(enabledDevices)
+                if (enabledDevices.isEmpty()) {
+                    Log.i(TAG, "No enabled devices, stopping service")
+                    stopAllAndShutdown()
+                }
             }
         }
 
         // Start state collection for notification updates
         stateCollectionJob = launch {
-            combine(
-                syncCoordinator.deviceStates,
-                pairedDevicesRepository.enabledDevices,
-            ) { deviceStates, enabledDevices ->
-                val connectedCount = deviceStates.count { (_, state) ->
-                    state is DeviceConnectionState.Connected ||
-                        state is DeviceConnectionState.Syncing
+            combine(syncCoordinator.deviceStates, pairedDevicesRepository.enabledDevices) {
+                    deviceStates,
+                    enabledDevices ->
+                    val connectedCount =
+                        deviceStates.count { (_, state) ->
+                            state is DeviceConnectionState.Connected ||
+                                state is DeviceConnectionState.Syncing
+                        }
+
+                    // Get last sync time from any syncing device
+                    val lastSyncTime =
+                        deviceStates.values
+                            .filterIsInstance<DeviceConnectionState.Syncing>()
+                            .mapNotNull { it.lastSyncInfo?.syncTime }
+                            .maxOrNull()
+
+                    // Trigger vibration if any device is in error state
+                    if (deviceStates.values.any { it is DeviceConnectionState.Error }) {
+                        vibrator.vibrate()
+                    }
+
+                    Triple(connectedCount, enabledDevices.size, lastSyncTime)
                 }
-
-                // Get last sync time from any syncing device
-                val lastSyncTime = deviceStates.values
-                    .filterIsInstance<DeviceConnectionState.Syncing>()
-                    .mapNotNull { it.lastSyncInfo?.syncTime }
-                    .maxOrNull()
-                
-                // Trigger vibration if any device is in error state
-                if (deviceStates.values.any { it is DeviceConnectionState.Error }) {
-                    vibrator.vibrate()
+                .collect { (connectedCount, enabledCount, lastSyncTime) ->
+                    updateNotification(connectedCount, enabledCount, lastSyncTime)
+                    _serviceState.value =
+                        MultiDeviceSyncServiceState.Running(
+                            connectedDeviceCount = connectedCount,
+                            enabledDeviceCount = enabledCount,
+                        )
                 }
-
-                Triple(connectedCount, enabledDevices.size, lastSyncTime)
-            }.collect { (connectedCount, enabledCount, lastSyncTime) ->
-                updateNotification(connectedCount, enabledCount, lastSyncTime)
-                _serviceState.value = MultiDeviceSyncServiceState.Running(
-                    connectedDeviceCount = connectedCount,
-                    enabledDeviceCount = enabledCount,
-                )
-            }
-        }
-    }
-
-    private suspend fun handleEnabledDevicesChanged(enabledDevices: List<PairedDevice>) {
-        Log.i(TAG, "Enabled devices changed: ${enabledDevices.size} devices")
-
-        val currentDevices = syncCoordinator.deviceStates.value.keys
-        val enabledMacAddresses = enabledDevices.map { it.macAddress }.toSet()
-
-        // Stop sync for devices that were disabled
-        currentDevices.filter { it !in enabledMacAddresses }.forEach { macAddress ->
-            Log.i(TAG, "Device $macAddress was disabled, stopping sync")
-            syncCoordinator.stopDeviceSync(macAddress)
-        }
-
-        // Start sync for newly enabled devices
-        enabledDevices.forEach { device ->
-            if (!syncCoordinator.isDeviceConnected(device.macAddress) &&
-                syncCoordinator.getDeviceState(device.macAddress) !is DeviceConnectionState.Connecting
-            ) {
-                Log.i(TAG, "Starting sync for enabled device: ${device.name ?: device.macAddress}")
-                syncCoordinator.startDeviceSync(device)
-            }
-        }
-
-        // If no enabled devices, stop the service
-        if (enabledDevices.isEmpty()) {
-            Log.i(TAG, "No enabled devices, stopping service")
-            stopAllAndShutdown()
         }
     }
 
     /**
-     * Refreshes connections to all enabled devices.
-     * Disconnects and reconnects to trigger a fresh scan.
+     * Refreshes connections to all enabled devices. Disconnects and reconnects to trigger a fresh
+     * scan.
      */
-    private suspend fun refreshConnections() {
-        val enabledDevices = pairedDevicesRepository.enabledDevices.first()
-
-        // Retry failed connections
-        enabledDevices.forEach { device ->
-            val state = syncCoordinator.getDeviceState(device.macAddress)
-            if (state is DeviceConnectionState.Error ||
-                state is DeviceConnectionState.Disconnected
-            ) {
-                syncCoordinator.startDeviceSync(device)
-            }
-        }
+    private fun refreshConnections() {
+        syncCoordinator.refreshConnections()
     }
 
-    /**
-     * Connects to a specific device.
-     */
+    /** Connects to a specific device. */
     fun connectDevice(device: PairedDevice) {
-        launch {
-            syncCoordinator.startDeviceSync(device)
-        }
+        launch { syncCoordinator.startDeviceSync(device) }
     }
 
-    /**
-     * Disconnects from a specific device without disabling it.
-     */
+    /** Disconnects from a specific device without disabling it. */
     fun disconnectDevice(macAddress: String) {
-        launch {
-            syncCoordinator.stopDeviceSync(macAddress)
-        }
+        launch { syncCoordinator.stopDeviceSync(macAddress) }
     }
 
     private fun updateNotification(
@@ -290,17 +251,17 @@ class MultiDeviceSyncService : Service(), CoroutineScope {
         enabledCount: Int,
         lastSyncTime: java.time.ZonedDateTime?,
     ) {
-        val notification = createMultiDeviceNotification(
-            context = this,
-            connectedCount = connectedCount,
-            totalEnabled = enabledCount,
-            lastSyncTime = lastSyncTime,
-        )
+        val notification =
+            createMultiDeviceNotification(
+                context = this,
+                connectedCount = connectedCount,
+                totalEnabled = enabledCount,
+                lastSyncTime = lastSyncTime,
+            )
 
-        if (PermissionChecker.checkSelfPermission(
-                this,
-                Manifest.permission.POST_NOTIFICATIONS,
-            ) == PermissionChecker.PERMISSION_GRANTED
+        if (
+            PermissionChecker.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) ==
+                PermissionChecker.PERMISSION_GRANTED
         ) {
             NotificationManagerCompat.from(this).notify(NOTIFICATION_ID, notification)
         }
@@ -313,12 +274,13 @@ class MultiDeviceSyncService : Service(), CoroutineScope {
     }
 
     private fun checkPermissions(): Boolean {
-        val requiredPermissions = listOf(
-            Manifest.permission.ACCESS_FINE_LOCATION,
-            Manifest.permission.BLUETOOTH_SCAN,
-            Manifest.permission.BLUETOOTH_CONNECT,
-            Manifest.permission.POST_NOTIFICATIONS,
-        )
+        val requiredPermissions =
+            listOf(
+                Manifest.permission.ACCESS_FINE_LOCATION,
+                Manifest.permission.BLUETOOTH_SCAN,
+                Manifest.permission.BLUETOOTH_CONNECT,
+                Manifest.permission.POST_NOTIFICATIONS,
+            )
 
         for (permission in requiredPermissions) {
             val result = PermissionChecker.checkSelfPermission(this, permission)
@@ -333,15 +295,15 @@ class MultiDeviceSyncService : Service(), CoroutineScope {
     private fun stopAndNotifyMissingPermission(missingPermission: String) {
         stopSelf()
 
-        val notification = createErrorNotificationBuilder(this)
-            .setContentTitle("Missing permission")
-            .setContentText("Cannot sync with cameras: $missingPermission is required")
-            .build()
+        val notification =
+            createErrorNotificationBuilder(this)
+                .setContentTitle("Missing permission")
+                .setContentText("Cannot sync with cameras: $missingPermission is required")
+                .build()
 
-        val hasNotificationPermission = ActivityCompat.checkSelfPermission(
-            this,
-            Manifest.permission.POST_NOTIFICATIONS,
-        ) == PackageManager.PERMISSION_GRANTED
+        val hasNotificationPermission =
+            ActivityCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) ==
+                PackageManager.PERMISSION_GRANTED
 
         if (!hasNotificationPermission) {
             Log.e(TAG, "Cannot show missing permission notification: $missingPermission")
@@ -377,32 +339,24 @@ class MultiDeviceSyncService : Service(), CoroutineScope {
             (binder as MultiDeviceSyncServiceBinder).getService()
 
         fun createStopIntent(context: Context): Intent =
-            Intent(context, MultiDeviceSyncService::class.java).apply {
-                action = ACTION_STOP
-            }
+            Intent(context, MultiDeviceSyncService::class.java).apply { action = ACTION_STOP }
 
         fun createRefreshIntent(context: Context): Intent =
-            Intent(context, MultiDeviceSyncService::class.java).apply {
-                action = ACTION_REFRESH
-            }
+            Intent(context, MultiDeviceSyncService::class.java).apply { action = ACTION_REFRESH }
 
         fun createStartIntent(context: Context): Intent =
             Intent(context, MultiDeviceSyncService::class.java)
     }
 }
 
-/**
- * Represents the state of the multi-device sync service.
- */
+/** Represents the state of the multi-device sync service. */
 sealed interface MultiDeviceSyncServiceState {
     /** Service is starting up. */
     data object Starting : MultiDeviceSyncServiceState
 
     /** Service is running and managing devices. */
-    data class Running(
-        val connectedDeviceCount: Int,
-        val enabledDeviceCount: Int,
-    ) : MultiDeviceSyncServiceState
+    data class Running(val connectedDeviceCount: Int, val enabledDeviceCount: Int) :
+        MultiDeviceSyncServiceState
 
     /** Service encountered an error. */
     data class Error(val message: String) : MultiDeviceSyncServiceState
@@ -410,4 +364,3 @@ sealed interface MultiDeviceSyncServiceState {
     /** Service has been stopped. */
     data object Stopped : MultiDeviceSyncServiceState
 }
-

@@ -293,6 +293,28 @@ class MultiDeviceSyncCoordinatorTest {
         assertFalse(coordinator.deviceStates.value.containsKey(testDevice1.macAddress))
     }
 
+    @Test
+    fun `camera disconnection updates state to Disconnected`() = testScope.runTest {
+        val connection = FakeCameraConnection(testDevice1.toTestCamera())
+        cameraRepository.connectionToReturn = connection
+
+        coordinator.startDeviceSync(testDevice1)
+        advanceUntilIdle()
+        assertTrue(coordinator.isDeviceConnected(testDevice1.macAddress))
+
+        // Simulate disconnection
+        connection.setConnected(false)
+        advanceUntilIdle()
+
+        assertFalse(coordinator.isDeviceConnected(testDevice1.macAddress))
+        assertEquals(
+            DeviceConnectionState.Disconnected,
+            coordinator.getDeviceState(testDevice1.macAddress),
+        )
+        // Should also unregister from location updates
+        assertEquals(0, locationCollector.getRegisteredDeviceCount())
+    }
+
     private fun PairedDevice.toTestCamera() = dev.sebastiano.ricohsync.domain.model.Camera(
         identifier = macAddress,
         name = name,

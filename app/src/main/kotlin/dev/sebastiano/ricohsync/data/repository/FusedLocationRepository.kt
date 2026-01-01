@@ -32,9 +32,7 @@ class FusedLocationRepository(
     private val minUpdateDistanceMeters: Float = DEFAULT_MIN_UPDATE_DISTANCE_METERS,
 ) : LocationRepository {
 
-    private val locationClient by lazy {
-        LocationServices.getFusedLocationProviderClient(context)
-    }
+    private val locationClient by lazy { LocationServices.getFusedLocationProviderClient(context) }
 
     private val _locationUpdates = MutableStateFlow<GpsLocation?>(null)
     override val locationUpdates: Flow<GpsLocation?> = _locationUpdates.asStateFlow()
@@ -45,20 +43,22 @@ class FusedLocationRepository(
     override fun startLocationUpdates() {
         if (locationCallback != null) return
 
-        val request = LocationRequest.Builder(
-            Priority.PRIORITY_HIGH_ACCURACY,
-            TimeUnit.SECONDS.toMillis(updateIntervalSeconds),
-        )
-            .setMinUpdateDistanceMeters(minUpdateDistanceMeters)
-            .build()
+        val request =
+            LocationRequest.Builder(
+                    Priority.PRIORITY_HIGH_ACCURACY,
+                    TimeUnit.SECONDS.toMillis(updateIntervalSeconds),
+                )
+                .setMinUpdateDistanceMeters(minUpdateDistanceMeters)
+                .build()
 
-        val callback = object : LocationCallback() {
-            override fun onLocationResult(result: LocationResult) {
-                result.lastLocation?.let { location ->
-                    _locationUpdates.value = location.toGpsLocation()
+        val callback =
+            object : LocationCallback() {
+                override fun onLocationResult(result: LocationResult) {
+                    result.lastLocation?.let { location ->
+                        _locationUpdates.value = location.toGpsLocation()
+                    }
                 }
             }
-        }
 
         locationClient
             .requestLocationUpdates(request, callback, Looper.getMainLooper())
@@ -75,15 +75,13 @@ class FusedLocationRepository(
         }
     }
 
-    private fun Location.toGpsLocation(): GpsLocation = GpsLocation(
-        latitude = latitude,
-        longitude = longitude,
-        altitude = altitude,
-        timestamp = ZonedDateTime.ofInstant(
-            Instant.ofEpochMilli(time),
-            ZoneId.of("UTC"),
-        ),
-    )
+    private fun Location.toGpsLocation(): GpsLocation =
+        GpsLocation(
+            latitude = latitude,
+            longitude = longitude,
+            altitude = altitude,
+            timestamp = ZonedDateTime.ofInstant(Instant.ofEpochMilli(time), ZoneId.of("UTC")),
+        )
 
     companion object {
         const val DEFAULT_UPDATE_INTERVAL_SECONDS = 30L

@@ -40,7 +40,9 @@ class DevicesListViewModel(
     private var service: MultiDeviceSyncService? = null
     private var serviceConnection: ServiceConnection? = null
     private val deviceStatesFromService = MutableStateFlow<Map<String, DeviceConnectionState>>(emptyMap())
+    private val isScanningFromService = MutableStateFlow(false)
     private var stateCollectionJob: Job? = null
+    private var scanningCollectionJob: Job? = null
 
     init {
         observeDevices()
@@ -52,7 +54,8 @@ class DevicesListViewModel(
             combine(
                 pairedDevicesRepository.pairedDevices,
                 deviceStatesFromService,
-            ) { pairedDevices, connectionStates ->
+                isScanningFromService,
+            ) { pairedDevices, connectionStates, isScanning ->
                 if (pairedDevices.isEmpty()) {
                     DevicesListState.Empty
                 } else {
@@ -65,6 +68,7 @@ class DevicesListViewModel(
                             }
                             PairedDeviceWithState(device, connectionState)
                         },
+                        isScanning = isScanning,
                     )
                 }
             }.collect { newState ->
@@ -96,13 +100,22 @@ class DevicesListViewModel(
                             deviceStatesFromService.value = states
                         }
                     }
+
+                    // Observe scanning state from service
+                    scanningCollectionJob = viewModelScope.launch(Dispatchers.IO) {
+                        service?.isScanning?.collect { isScanning ->
+                            isScanningFromService.value = isScanning
+                        }
+                    }
                 }
 
                 override fun onServiceDisconnected(name: ComponentName?) {
                     Log.i(TAG, "Disconnected from MultiDeviceSyncService")
                     service = null
                     stateCollectionJob?.cancel()
+                    scanningCollectionJob?.cancel()
                     deviceStatesFromService.value = emptyMap()
+                    isScanningFromService.value = false
                 }
             }
 
@@ -149,9 +162,21 @@ class DevicesListViewModel(
         }
     }
 
+    /**
+     * Manually triggers a scan for all enabled but disconnected devices.
+     */
+    fun refreshConnections() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val context = bindingContextProvider()
+            val intent = MultiDeviceSyncService.createRefreshIntent(context)
+            context.startService(intent)
+        }
+    }
+
     override fun onCleared() {
         super.onCleared()
         stateCollectionJob?.cancel()
+        scanningCollectionJob?.cancel()
         serviceConnection?.let { connection ->
             try {
                 bindingContextProvider().unbindService(connection)
@@ -175,6 +200,7 @@ sealed interface DevicesListState {
     /** Has one or more paired devices. */
     data class HasDevices(
         val devices: List<PairedDeviceWithState>,
+        val isScanning: Boolean = false,
     ) : DevicesListState
 }
 

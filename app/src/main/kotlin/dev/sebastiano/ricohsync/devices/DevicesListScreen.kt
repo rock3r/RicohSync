@@ -37,6 +37,7 @@ import androidx.compose.material.icons.rounded.CameraAlt
 import androidx.compose.material.icons.rounded.Error
 import androidx.compose.material.icons.rounded.ExpandLess
 import androidx.compose.material.icons.rounded.ExpandMore
+import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Sync
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
@@ -44,6 +45,8 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
@@ -60,22 +63,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.sebastiano.ricohsync.devicesync.formatElapsedTimeSince
 import dev.sebastiano.ricohsync.domain.model.DeviceConnectionState
 import dev.sebastiano.ricohsync.domain.model.PairedDeviceWithState
 
-/**
- * Main screen showing the list of paired devices with their sync status.
- */
+/** Main screen showing the list of paired devices with their sync status. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DevicesListScreen(
-    viewModel: DevicesListViewModel,
-    onAddDeviceClick: () -> Unit,
-) {
+fun DevicesListScreen(viewModel: DevicesListViewModel, onAddDeviceClick: () -> Unit) {
     val state by viewModel.state
     var deviceToUnpair by remember { mutableStateOf<PairedDeviceWithState?>(null) }
 
@@ -84,6 +81,13 @@ fun DevicesListScreen(
         topBar = {
             TopAppBar(
                 title = { Text("RicohSync") },
+                actions = {
+                    if (state is DevicesListState.HasDevices) {
+                        IconButton(onClick = { viewModel.refreshConnections() }) {
+                            Icon(Icons.Rounded.Refresh, contentDescription = "Refresh connections")
+                        }
+                    }
+                },
             )
         },
         floatingActionButton = {
@@ -105,17 +109,20 @@ fun DevicesListScreen(
             }
 
             is DevicesListState.HasDevices -> {
-                DevicesList(
-                    devices = currentState.devices,
-                    contentPadding = innerPadding,
-                    onDeviceEnabledChange = { device, enabled ->
-                        viewModel.setDeviceEnabled(device.device.macAddress, enabled)
-                    },
-                    onUnpairClick = { device -> deviceToUnpair = device },
-                    onRetryClick = { device ->
-                        viewModel.retryConnection(device.device.macAddress)
-                    },
-                )
+                Column(modifier = Modifier.padding(innerPadding)) {
+                    if (currentState.isScanning) {
+                        LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                    }
+                    DevicesList(
+                        devices = currentState.devices,
+                        contentPadding = PaddingValues(0.dp),
+                        onDeviceEnabledChange = { device, enabled ->
+                            viewModel.setDeviceEnabled(device.device.macAddress, enabled)
+                        },
+                        onUnpairClick = { device -> deviceToUnpair = device },
+                        onRetryClick = { device -> viewModel.retryConnection(device.device.macAddress) },
+                    )
+                }
             }
         }
     }
@@ -135,23 +142,14 @@ fun DevicesListScreen(
 
 @Composable
 private fun LoadingContent(modifier: Modifier = Modifier) {
-    Box(
-        modifier = modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center,
-    ) {
+    Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Text("Loading devices...", style = MaterialTheme.typography.bodyLarge)
     }
 }
 
 @Composable
-private fun EmptyContent(
-    modifier: Modifier = Modifier,
-    onAddDeviceClick: () -> Unit,
-) {
-    Box(
-        modifier = modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center,
-    ) {
+private fun EmptyContent(modifier: Modifier = Modifier, onAddDeviceClick: () -> Unit) {
+    Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier.padding(32.dp),
@@ -191,12 +189,13 @@ private fun DevicesList(
     onRetryClick: (PairedDeviceWithState) -> Unit,
 ) {
     LazyColumn(
-        contentPadding = PaddingValues(
-            start = 16.dp,
-            end = 16.dp,
-            top = contentPadding.calculateTopPadding() + 8.dp,
-            bottom = contentPadding.calculateBottomPadding() + 80.dp, // Room for FAB
-        ),
+        contentPadding =
+            PaddingValues(
+                start = 16.dp,
+                end = 16.dp,
+                top = contentPadding.calculateTopPadding() + 8.dp,
+                bottom = contentPadding.calculateBottomPadding() + 80.dp, // Room for FAB
+            ),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         items(devices, key = { it.device.macAddress }) { deviceWithState ->
@@ -229,10 +228,8 @@ private fun DeviceCard(
         Column {
             // Main row
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { isExpanded = !isExpanded }
-                    .padding(16.dp),
+                modifier =
+                    Modifier.fillMaxWidth().clickable { isExpanded = !isExpanded }.padding(16.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 // Status indicator
@@ -257,10 +254,7 @@ private fun DeviceCard(
                 Spacer(Modifier.width(8.dp))
 
                 // Enable/disable switch
-                Switch(
-                    checked = device.isEnabled,
-                    onCheckedChange = onEnabledChange,
-                )
+                Switch(checked = device.isEnabled, onCheckedChange = onEnabledChange)
 
                 // Expand indicator
                 Icon(
@@ -277,9 +271,8 @@ private fun DeviceCard(
                 exit = shrinkVertically(),
             ) {
                 Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
+                    modifier =
+                        Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 16.dp)
                 ) {
                     // Device details
                     DeviceDetailRow("MAC Address", device.macAddress)
@@ -290,10 +283,7 @@ private fun DeviceCard(
                             DeviceDetailRow("Firmware", version)
                         }
                         connectionState.lastSyncInfo?.let { syncInfo ->
-                            DeviceDetailRow(
-                                "Last sync",
-                                formatElapsedTimeSince(syncInfo.syncTime),
-                            )
+                            DeviceDetailRow("Last sync", formatElapsedTimeSince(syncInfo.syncTime))
                             DeviceDetailRow(
                                 "Location",
                                 "${syncInfo.location.latitude.format(4)}, ${syncInfo.location.longitude.format(4)}",
@@ -311,23 +301,15 @@ private fun DeviceCard(
 
                         if (connectionState.isRecoverable) {
                             Spacer(Modifier.height(8.dp))
-                            TextButton(onClick = onRetryClick) {
-                                Text("Retry connection")
-                            }
+                            TextButton(onClick = onRetryClick) { Text("Retry connection") }
                         }
                     }
 
                     Spacer(Modifier.height(12.dp))
 
                     // Unpair action
-                    TextButton(
-                        onClick = onUnpairClick,
-                        modifier = Modifier.align(Alignment.End),
-                    ) {
-                        Text(
-                            "Unpair device",
-                            color = MaterialTheme.colorScheme.error,
-                        )
+                    TextButton(onClick = onUnpairClick, modifier = Modifier.align(Alignment.End)) {
+                        Text("Unpair device", color = MaterialTheme.colorScheme.error)
                     }
                 }
             }
@@ -337,62 +319,46 @@ private fun DeviceCard(
 
 @Composable
 private fun ConnectionStatusIcon(state: DeviceConnectionState) {
-    val (icon, color, shouldAnimate) = when (state) {
-        is DeviceConnectionState.Disabled -> Triple(
-            Icons.Rounded.BluetoothDisabled,
-            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-            false,
-        )
-        is DeviceConnectionState.Disconnected -> Triple(
-            Icons.Rounded.Bluetooth,
-            MaterialTheme.colorScheme.onSurfaceVariant,
-            false,
-        )
-        is DeviceConnectionState.Connecting -> Triple(
-            Icons.Rounded.Bluetooth,
-            MaterialTheme.colorScheme.primary,
-            true,
-        )
-        is DeviceConnectionState.Connected -> Triple(
-            Icons.Rounded.BluetoothConnected,
-            MaterialTheme.colorScheme.primary,
-            false,
-        )
-        is DeviceConnectionState.Error -> Triple(
-            Icons.Rounded.Error,
-            MaterialTheme.colorScheme.error,
-            false,
-        )
-        is DeviceConnectionState.Syncing -> Triple(
-            Icons.Rounded.Sync,
-            MaterialTheme.colorScheme.primary,
-            true,
-        )
-    }
+    val (icon, color, shouldAnimate) =
+        when (state) {
+            is DeviceConnectionState.Disabled ->
+                Triple(
+                    Icons.Rounded.BluetoothDisabled,
+                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                    false,
+                )
+            is DeviceConnectionState.Disconnected ->
+                Triple(Icons.Rounded.Bluetooth, MaterialTheme.colorScheme.onSurfaceVariant, false)
+            is DeviceConnectionState.Connecting ->
+                Triple(Icons.Rounded.Bluetooth, MaterialTheme.colorScheme.primary, true)
+            is DeviceConnectionState.Connected ->
+                Triple(Icons.Rounded.BluetoothConnected, MaterialTheme.colorScheme.primary, false)
+            is DeviceConnectionState.Error ->
+                Triple(Icons.Rounded.Error, MaterialTheme.colorScheme.error, false)
+            is DeviceConnectionState.Syncing ->
+                Triple(Icons.Rounded.Sync, MaterialTheme.colorScheme.primary, true)
+        }
 
-    val animatedColor by animateColorAsState(
-        targetValue = color,
-        label = "status_color",
-    )
+    val animatedColor by animateColorAsState(targetValue = color, label = "status_color")
 
     Box(
-        modifier = Modifier
-            .size(40.dp)
-            .clip(CircleShape)
-            .background(animatedColor.copy(alpha = 0.15f)),
+        modifier =
+            Modifier.size(40.dp).clip(CircleShape).background(animatedColor.copy(alpha = 0.15f)),
         contentAlignment = Alignment.Center,
     ) {
         if (shouldAnimate) {
             val infiniteTransition = rememberInfiniteTransition(label = "icon_animation")
-            val rotation by infiniteTransition.animateFloat(
-                initialValue = 0f,
-                targetValue = if (state is DeviceConnectionState.Syncing) -360f else 360f,
-                animationSpec = InfiniteRepeatableSpec(
-                    animation = tween(1500, easing = EaseInOut),
-                    repeatMode = RepeatMode.Restart,
-                ),
-                label = "rotation",
-            )
+            val rotation by
+                infiniteTransition.animateFloat(
+                    initialValue = 0f,
+                    targetValue = if (state is DeviceConnectionState.Syncing) -360f else 360f,
+                    animationSpec =
+                        InfiniteRepeatableSpec(
+                            animation = tween(1500, easing = EaseInOut),
+                            repeatMode = RepeatMode.Restart,
+                        ),
+                    label = "rotation",
+                )
 
             Icon(
                 icon,
@@ -401,40 +367,32 @@ private fun ConnectionStatusIcon(state: DeviceConnectionState) {
                 modifier = Modifier.rotate(rotation),
             )
         } else {
-            Icon(
-                icon,
-                contentDescription = null,
-                tint = animatedColor,
-            )
+            Icon(icon, contentDescription = null, tint = animatedColor)
         }
     }
 }
 
 @Composable
 private fun ConnectionStatusText(state: DeviceConnectionState) {
-    val (text, color) = when (state) {
-        is DeviceConnectionState.Disabled -> "Disabled" to MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-        is DeviceConnectionState.Disconnected -> "Disconnected" to MaterialTheme.colorScheme.onSurfaceVariant
-        is DeviceConnectionState.Connecting -> "Connecting..." to MaterialTheme.colorScheme.primary
-        is DeviceConnectionState.Connected -> "Connected" to MaterialTheme.colorScheme.primary
-        is DeviceConnectionState.Error -> "Error" to MaterialTheme.colorScheme.error
-        is DeviceConnectionState.Syncing -> "Syncing" to MaterialTheme.colorScheme.primary
-    }
+    val (text, color) =
+        when (state) {
+            is DeviceConnectionState.Disabled ->
+                "Disabled" to MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+            is DeviceConnectionState.Disconnected ->
+                "Disconnected" to MaterialTheme.colorScheme.onSurfaceVariant
+            is DeviceConnectionState.Connecting ->
+                "Connecting..." to MaterialTheme.colorScheme.primary
+            is DeviceConnectionState.Connected -> "Connected" to MaterialTheme.colorScheme.primary
+            is DeviceConnectionState.Error -> "Error" to MaterialTheme.colorScheme.error
+            is DeviceConnectionState.Syncing -> "Syncing" to MaterialTheme.colorScheme.primary
+        }
 
-    Text(
-        text = text,
-        style = MaterialTheme.typography.bodySmall,
-        color = color,
-    )
+    Text(text = text, style = MaterialTheme.typography.bodySmall, color = color)
 }
 
 @Composable
 private fun DeviceDetailRow(label: String, value: String) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp),
-    ) {
+    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
         Text(
             text = label,
             style = MaterialTheme.typography.labelMedium,
@@ -459,20 +417,17 @@ private fun UnpairConfirmationDialog(
         onDismissRequest = onDismiss,
         title = { Text("Unpair device?") },
         text = {
-            Text("Are you sure you want to unpair \"$deviceName\"? You'll need to pair it again to sync data.")
+            Text(
+                "Are you sure you want to unpair \"$deviceName\"? You'll need to pair it again to sync data."
+            )
         },
         confirmButton = {
             TextButton(onClick = onConfirm) {
                 Text("Unpair", color = MaterialTheme.colorScheme.error)
             }
         },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel")
-            }
-        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )
 }
 
 private fun Double.format(decimals: Int): String = "%.${decimals}f".format(this)
-

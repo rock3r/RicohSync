@@ -4,10 +4,15 @@ import dev.sebastiano.ricohsync.domain.model.Camera
 import dev.sebastiano.ricohsync.domain.model.GpsLocation
 import dev.sebastiano.ricohsync.domain.repository.CameraConnection
 import java.time.ZonedDateTime
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 
 class FakeCameraConnection(
     override val camera: Camera,
 ) : CameraConnection {
+
+    private val _isConnected = MutableStateFlow(true)
+    override val isConnected: Flow<Boolean> = _isConnected
 
     var firmwareVersion = "1.0.0"
     var pairedDeviceName: String? = null
@@ -55,5 +60,10 @@ class FakeCameraConnection(
 
     override suspend fun disconnect() {
         disconnectCalled = true
+        _isConnected.value = false
+    }
+
+    fun setConnected(connected: Boolean) {
+        _isConnected.value = connected
     }
 }

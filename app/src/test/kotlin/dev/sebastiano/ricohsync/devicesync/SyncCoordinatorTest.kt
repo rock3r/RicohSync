@@ -255,4 +255,20 @@ class SyncCoordinatorTest {
         val state = syncCoordinator.state.value as SyncState.Syncing
         assertEquals(testLocation, state.lastSyncInfo?.location)
     }
+
+    @Test
+    fun `camera disconnection transitions to Disconnected state`() = testScope.runTest {
+        syncCoordinator.startSync(testCamera)
+        advanceUntilIdle()
+        assertTrue(syncCoordinator.isSyncing())
+
+        // Simulate disconnection
+        cameraConnection.setConnected(false)
+        advanceUntilIdle()
+
+        assertFalse(syncCoordinator.isSyncing())
+        val state = syncCoordinator.state.value
+        assertTrue(state is SyncState.Disconnected)
+        assertEquals(testCamera, (state as SyncState.Disconnected).camera)
+    }
 }

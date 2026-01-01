@@ -16,16 +16,27 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.onCompletion
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.TimeoutCancellationException
 
 private const val TAG = "MultiDeviceSyncCoordinator"
+private const val PERIODIC_SCAN_INTERVAL_MS = 60_000L // 1 minute
 
 /**
  * Coordinates synchronization with multiple camera devices simultaneously.
@@ -57,11 +68,86 @@ class MultiDeviceSyncCoordinator(
      */
     val deviceStates: StateFlow<Map<String, DeviceConnectionState>> = _deviceStates.asStateFlow()
 
+    private val _isScanning = MutableStateFlow(false)
+
+    /**
+     * Flow that emits true when a scan/discovery pass is in progress.
+     */
+    val isScanning: StateFlow<Boolean> = combine(_isScanning, _deviceStates) { scanning, states ->
+        scanning || states.values.any { it is DeviceConnectionState.Connecting }
+    }.stateIn(coroutineScope, SharingStarted.Eagerly, false)
+
     private val deviceJobs = mutableMapOf<String, Job>()
     private val deviceConnections = mutableMapOf<String, CameraConnection>()
     private val jobsMutex = Mutex()
+    private val scanMutex = Mutex()
 
     private var locationSyncJob: Job? = null
+    private var backgroundMonitoringJob: Job? = null
+    private val enabledDevicesFlow = MutableStateFlow<List<PairedDevice>>(emptyList())
+
+    /**
+     * Starts background monitoring of enabled devices.
+     * This will periodically scan for and connect to devices that are enabled but not connected.
+     *
+     * @param enabledDevices Flow of enabled devices from the repository.
+     */
+    fun startBackgroundMonitoring(enabledDevices: Flow<List<PairedDevice>>) {
+        if (backgroundMonitoringJob != null) return
+
+        backgroundMonitoringJob = coroutineScope.launch {
+            // Job for observing enabled devices
+            launch {
+                enabledDevices.collect { devices ->
+                    enabledDevicesFlow.value = devices
+                    checkAndConnectEnabledDevices()
+                }
+            }
+
+            // Job for periodic scanning
+            launch {
+                while (true) {
+                    delay(PERIODIC_SCAN_INTERVAL_MS)
+                    Log.d(TAG, "Running periodic scan for enabled devices...")
+                    checkAndConnectEnabledDevices()
+                }
+            }
+        }
+    }
+
+    /**
+     * Manually triggers a scan for all enabled but disconnected devices.
+     */
+    fun refreshConnections() {
+        Log.i(TAG, "Manual refresh requested")
+        coroutineScope.launch {
+            checkAndConnectEnabledDevices()
+        }
+    }
+
+    private suspend fun checkAndConnectEnabledDevices() {
+        _isScanning.value = true
+        try {
+            scanMutex.withLock {
+                val enabledDevices = enabledDevicesFlow.value
+                enabledDevices.forEach { device ->
+                    val macAddress = device.macAddress
+                    val state = getDeviceState(macAddress)
+
+                    if (state is DeviceConnectionState.Disconnected ||
+                        (state is DeviceConnectionState.Error && state.isRecoverable)) {
+                        Log.d(
+                            TAG,
+                            "Device $macAddress is enabled but not connected (state: $state), attempting sync..."
+                        )
+                        startDeviceSync(device)
+                    }
+                }
+            }
+        } finally {
+            _isScanning.value = false
+        }
+    }
 
     /**
      * Starts syncing with a paired device.
@@ -77,16 +163,6 @@ class MultiDeviceSyncCoordinator(
     fun startDeviceSync(device: PairedDevice) {
         val macAddress = device.macAddress
 
-        // Check if already syncing synchronously to avoid race conditions
-        val alreadySyncing = synchronized(deviceJobs) {
-            deviceJobs.containsKey(macAddress)
-        }
-
-        if (alreadySyncing) {
-            Log.w(TAG, "Device $macAddress already syncing, ignoring")
-            return
-        }
-
         val vendor = vendorRegistry.getVendorById(device.vendorId)
         if (vendor == null) {
             Log.e(TAG, "Unknown vendor ${device.vendorId} for device $macAddress")
@@ -101,64 +177,79 @@ class MultiDeviceSyncCoordinator(
         }
 
         val camera = device.toCamera(vendor)
-        startCameraSync(camera)
-    }
 
-    /**
-     * Starts syncing with a camera.
-     */
-    private fun startCameraSync(camera: Camera) {
-        val macAddress = camera.macAddress
+        synchronized(deviceJobs) {
+            if (deviceJobs.containsKey(macAddress)) {
+                Log.w(TAG, "Device $macAddress already syncing, ignoring")
+                return
+            }
 
-        val job = coroutineScope.launch {
+            // Set state to connecting immediately before launching the job
             updateDeviceState(macAddress, DeviceConnectionState.Connecting)
 
-            try {
-                val connection = connectToCamera(camera)
+            val job =
+                coroutineScope.launch {
+                    try {
+                        // Register for location updates early, as soon as we start connecting
+                        // This starts location collection so it's ready by the time we connect
+                        locationCollector.registerDevice(macAddress)
 
-                jobsMutex.withLock {
-                    deviceConnections[macAddress] = connection
+                        Log.d(TAG, "Starting connection attempt for $macAddress...")
+                        val connection = withTimeout(30_000L) {
+                            connectToCamera(camera)
+                        }
+
+                        jobsMutex.withLock { deviceConnections[macAddress] = connection }
+
+                        val firmwareVersion = performInitialSetup(connection)
+
+                        updateDeviceState(
+                            macAddress,
+                            DeviceConnectionState.Syncing(firmwareVersion = firmwareVersion),
+                        )
+
+                        // Start the global location sync if not already running
+                        ensureLocationSyncRunning()
+
+                        // Wait until the connection is fully established
+                        connection.isConnected.filter { it }.first()
+                        Log.i(TAG, "Device $macAddress successfully connected")
+
+                        // Wait until the connection is lost or the job is cancelled
+                        connection.isConnected.filter { !it }.first()
+
+                        Log.i(TAG, "Connection lost for $macAddress")
+                        cleanup(macAddress, preserveErrorState = false)
+                    } catch (e: TimeoutCancellationException) {
+                        Log.e(TAG, "Connection timed out for $macAddress")
+                        updateDeviceState(
+                            macAddress,
+                            DeviceConnectionState.Error(
+                                message = "Connection timed out. Is the camera nearby?"
+                            ),
+                        )
+                        cleanup(macAddress, preserveErrorState = true)
+                    } catch (e: CancellationException) {
+                        Log.i(TAG, "Sync cancelled for $macAddress")
+                        cleanup(macAddress, preserveErrorState = false)
+                        throw e
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Connection error for $macAddress", e)
+                        val errorMessage =
+                            when {
+                                e.message?.contains("pairing", ignoreCase = true) == true ->
+                                    "Pairing rejected. Enable pairing on your camera."
+                                e.message?.contains("timeout", ignoreCase = true) == true ->
+                                    "Connection timed out. Is the camera nearby?"
+                                else -> e.message ?: "Connection failed"
+                            }
+                        updateDeviceState(
+                            macAddress,
+                            DeviceConnectionState.Error(message = errorMessage),
+                        )
+                        cleanup(macAddress, preserveErrorState = true)
+                    }
                 }
-
-                val firmwareVersion = performInitialSetup(connection)
-
-                updateDeviceState(
-                    macAddress,
-                    DeviceConnectionState.Syncing(firmwareVersion = firmwareVersion),
-                )
-
-                // Register for location updates
-                locationCollector.registerDevice(macAddress)
-
-                // Start the global location sync if not already running
-                ensureLocationSyncRunning()
-
-                // Wait for cancellation (device will be removed via stopDeviceSync)
-                // The location sync is handled globally, not per-device
-                awaitCancellation()
-            } catch (e: CancellationException) {
-                Log.i(TAG, "Sync cancelled for $macAddress")
-                cleanup(macAddress, preserveErrorState = false)
-                throw e
-            } catch (e: Exception) {
-                Log.e(TAG, "Connection error for $macAddress", e)
-                val errorMessage = when {
-                    e.message?.contains("pairing", ignoreCase = true) == true ->
-                        "Pairing rejected. Enable pairing on your camera."
-                    e.message?.contains("timeout", ignoreCase = true) == true ->
-                        "Connection timed out. Is the camera nearby?"
-                    else -> e.message ?: "Connection failed"
-                }
-                updateDeviceState(
-                    macAddress,
-                    DeviceConnectionState.Error(message = errorMessage),
-                )
-                cleanup(macAddress, preserveErrorState = true)
-            }
-        }
-
-        // Store the job synchronously to avoid race conditions
-        synchronized(deviceJobs) {
             deviceJobs[macAddress] = job
         }
     }
@@ -284,10 +375,13 @@ class MultiDeviceSyncCoordinator(
     }
 
     /**
-     * Stops syncing with all devices.
+     * Stops syncing with all devices and stops background monitoring.
      */
     suspend fun stopAllDevices() {
         Log.i(TAG, "Stopping all device syncs")
+
+        backgroundMonitoringJob?.cancel()
+        backgroundMonitoringJob = null
 
         val jobs = synchronized(deviceJobs) {
             deviceJobs.values.toList()

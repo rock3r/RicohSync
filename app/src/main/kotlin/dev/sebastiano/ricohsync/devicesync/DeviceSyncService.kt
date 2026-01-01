@@ -50,14 +50,15 @@ internal class DeviceSyncService : Service(), CoroutineScope {
         Dispatchers.IO + CoroutineName("DeviceSyncService") + SupervisorJob()
 
     private val binder by lazy { DeviceSyncServiceBinder() }
-    
+
     private val vibrator by lazy { SyncErrorVibrator(applicationContext) }
 
     private val syncCoordinator by lazy {
         SyncCoordinator(
-            cameraRepository = KableCameraRepository(
-                vendorRegistry = dev.sebastiano.ricohsync.RicohSyncApp.createVendorRegistry(),
-            ),
+            cameraRepository =
+                KableCameraRepository(
+                    vendorRegistry = dev.sebastiano.ricohsync.RicohSyncApp.createVendorRegistry()
+                ),
             locationRepository = FusedLocationRepository(applicationContext),
             coroutineScope = this,
         )
@@ -71,12 +72,16 @@ internal class DeviceSyncService : Service(), CoroutineScope {
 
     override fun onCreate() {
         super.onCreate()
-        ProcessLifecycleOwner.get().lifecycle.addObserver(object : DefaultLifecycleObserver {
-            override fun onStart(owner: LifecycleOwner) {
-                Log.d(TAG, "App brought to foreground, stopping vibration")
-                vibrator.stop()
-            }
-        })
+        ProcessLifecycleOwner.get()
+            .lifecycle
+            .addObserver(
+                object : DefaultLifecycleObserver {
+                    override fun onStart(owner: LifecycleOwner) {
+                        Log.d(TAG, "App brought to foreground, stopping vibration")
+                        vibrator.stop()
+                    }
+                }
+            )
     }
 
     override fun onBind(intent: Intent): IBinder {
@@ -142,12 +147,13 @@ internal class DeviceSyncService : Service(), CoroutineScope {
     }
 
     private fun checkPermissions(): Boolean {
-        val requiredPermissions = listOf(
-            Manifest.permission.ACCESS_FINE_LOCATION,
-            Manifest.permission.BLUETOOTH_SCAN,
-            Manifest.permission.BLUETOOTH_CONNECT,
-            Manifest.permission.POST_NOTIFICATIONS,
-        )
+        val requiredPermissions =
+            listOf(
+                Manifest.permission.ACCESS_FINE_LOCATION,
+                Manifest.permission.BLUETOOTH_SCAN,
+                Manifest.permission.BLUETOOTH_CONNECT,
+                Manifest.permission.POST_NOTIFICATIONS,
+            )
 
         for (permission in requiredPermissions) {
             val result = PermissionChecker.checkSelfPermission(this, permission)
@@ -162,15 +168,15 @@ internal class DeviceSyncService : Service(), CoroutineScope {
     private fun stopAndNotifyMissingPermission(missingPermission: String) {
         stopSelf()
 
-        val notification = createErrorNotificationBuilder(this)
-            .setContentTitle("Missing permission")
-            .setContentText("Cannot sync with camera: $missingPermission is required")
-            .build()
+        val notification =
+            createErrorNotificationBuilder(this)
+                .setContentTitle("Missing permission")
+                .setContentText("Cannot sync with camera: $missingPermission is required")
+                .build()
 
-        val hasNotificationPermission = ActivityCompat.checkSelfPermission(
-            this,
-            Manifest.permission.POST_NOTIFICATIONS,
-        ) == PackageManager.PERMISSION_GRANTED
+        val hasNotificationPermission =
+            ActivityCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) ==
+                PackageManager.PERMISSION_GRANTED
 
         if (!hasNotificationPermission) {
             Log.e(TAG, "Cannot show missing permission notification: $missingPermission")
@@ -213,14 +219,16 @@ internal class DeviceSyncService : Service(), CoroutineScope {
 }
 
 /** Maps domain SyncState to the UI-facing DeviceSyncState. */
-private fun SyncState.toDeviceSyncState(): DeviceSyncState = when (this) {
-    SyncState.Idle -> DeviceSyncState.Starting
-    is SyncState.Connecting -> DeviceSyncState.Connecting(camera)
-    is SyncState.Syncing -> DeviceSyncState.Syncing(
-        camera = camera,
-        firmwareVersion = firmwareVersion,
-        syncInfo = lastSyncInfo,
-    )
-    is SyncState.Disconnected -> DeviceSyncState.Disconnected(camera)
-    SyncState.Stopped -> DeviceSyncState.Stopped
-}
+private fun SyncState.toDeviceSyncState(): DeviceSyncState =
+    when (this) {
+        SyncState.Idle -> DeviceSyncState.Starting
+        is SyncState.Connecting -> DeviceSyncState.Connecting(camera)
+        is SyncState.Syncing ->
+            DeviceSyncState.Syncing(
+                camera = camera,
+                firmwareVersion = firmwareVersion,
+                syncInfo = lastSyncInfo,
+            )
+        is SyncState.Disconnected -> DeviceSyncState.Disconnected(camera)
+        SyncState.Stopped -> DeviceSyncState.Stopped
+    }
