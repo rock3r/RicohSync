@@ -21,9 +21,7 @@
     <uses-permission
         android:name="android.permission.POST_NOTIFICATIONS"
         tools:node="replace" />
-    <uses-permission
-        android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE"
-        tools:node="replace" />
+    <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission
         android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE"
         tools:node="replace" />
@@ -45,6 +43,11 @@
 
         <service
             android:name=".devicesync.DeviceSyncService"
+            android:exported="false"
+            android:foregroundServiceType="connectedDevice|location" />
+
+        <service
+            android:name=".devicesync.MultiDeviceSyncService"
             android:exported="false"
             android:foregroundServiceType="connectedDevice|location" />
 

@@ -138,3 +138,68 @@ fun registerNotificationChannel(context: Context) {
 
     notificationManager.createNotificationChannel(channel)
 }
+
+// --- Multi-device notification functions ---
+
+/**
+ * Creates a notification for multi-device sync showing connection status.
+ */
+internal fun createMultiDeviceNotification(
+    context: Context,
+    connectedCount: Int,
+    totalEnabled: Int,
+    lastSyncTime: java.time.ZonedDateTime?,
+): Notification {
+    val title = when {
+        connectedCount == 0 && totalEnabled == 0 -> "No devices enabled"
+        connectedCount == 0 -> "Searching for $totalEnabled device${if (totalEnabled > 1) "s" else ""}..."
+        connectedCount == 1 -> "Syncing with 1 device"
+        else -> "Syncing with $connectedCount devices"
+    }
+
+    val content = when {
+        connectedCount == 0 && totalEnabled == 0 -> "Enable devices to start syncing"
+        connectedCount == 0 -> "Will connect when cameras are in range"
+        lastSyncTime != null -> "Last sync: ${formatElapsedTimeSince(lastSyncTime)}"
+        else -> "Connected and syncing"
+    }
+
+    val icon = when {
+        connectedCount == 0 -> R.drawable.ic_sync_disabled
+        else -> R.drawable.ic_sync
+    }
+
+    return NotificationCompat.Builder(context, NOTIFICATION_CHANNEL)
+        .setOngoing(true)
+        .setPriority(PRIORITY_LOW)
+        .setCategory(Notification.CATEGORY_LOCATION_SHARING)
+        .setSilent(true)
+        .setContentTitle(title)
+        .setContentText(content)
+        .setSmallIcon(icon)
+        .addAction(
+            NotificationCompat.Action.Builder(
+                /* icon = */ 0,
+                /* title = */ "Refresh",
+                /* intent = */ PendingIntent.getService(
+                    context,
+                    MultiDeviceSyncService.REFRESH_REQUEST_CODE,
+                    MultiDeviceSyncService.createRefreshIntent(context),
+                    PendingIntent.FLAG_IMMUTABLE,
+                ),
+            ).build(),
+        )
+        .addAction(
+            NotificationCompat.Action.Builder(
+                /* icon = */ 0,
+                /* title = */ "Stop all",
+                /* intent = */ PendingIntent.getService(
+                    context,
+                    MultiDeviceSyncService.STOP_REQUEST_CODE,
+                    MultiDeviceSyncService.createStopIntent(context),
+                    PendingIntent.FLAG_IMMUTABLE,
+                ),
+            ).build(),
+        )
+        .build()
+}

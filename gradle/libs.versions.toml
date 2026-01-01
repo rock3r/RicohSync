@@ -11,8 +11,9 @@ junit = "4.13.2"
 junitVersion = "1.3.0"
 kable = "0.41.0"
 kotlin = "2.3.0"
-lifecycleRuntimeKtx = "2.10.0"
-mockk = "1.14.7"
+    lifecycleRuntimeKtx = "2.10.0"
+    lifecycleProcess = "2.10.0"
+    mockk = "1.14.7"
 protobufPlugin = "0.9.6"
 protobuf = "4.33.2"
 playServicesLocation = "21.3.0"
@@ -26,6 +27,7 @@ androidx-dataStore = { module = "androidx.datastore:datastore", version.ref = "d
 androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }
 androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycleRuntimeKtx" }
+androidx-lifecycle-process = { group = "androidx.lifecycle", name = "lifecycle-process", version.ref = "lifecycleProcess" }
 androidx-material3 = { group = "androidx.compose.material3", name = "material3" }
 androidx-material-icons = { module = "androidx.compose.material:material-icons-extended" }
 androidx-ui = { group = "androidx.compose.ui", name = "ui" }

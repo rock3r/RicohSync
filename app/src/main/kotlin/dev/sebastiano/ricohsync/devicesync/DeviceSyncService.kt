@@ -14,6 +14,9 @@ import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.app.ServiceCompat
 import androidx.core.content.PermissionChecker
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.ProcessLifecycleOwner
 import dev.sebastiano.ricohsync.data.repository.FusedLocationRepository
 import dev.sebastiano.ricohsync.data.repository.KableCameraRepository
 import dev.sebastiano.ricohsync.domain.model.RicohCamera
@@ -47,6 +50,8 @@ internal class DeviceSyncService : Service(), CoroutineScope {
         Dispatchers.IO + CoroutineName("DeviceSyncService") + SupervisorJob()
 
     private val binder by lazy { DeviceSyncServiceBinder() }
+    
+    private val vibrator by lazy { SyncErrorVibrator(applicationContext) }
 
     private val syncCoordinator by lazy {
         SyncCoordinator(
@@ -63,6 +68,16 @@ internal class DeviceSyncService : Service(), CoroutineScope {
         syncCoordinator.state
             .map { it.toDeviceSyncState() }
             .shareIn(this, SharingStarted.WhileSubscribed())
+
+    override fun onCreate() {
+        super.onCreate()
+        ProcessLifecycleOwner.get().lifecycle.addObserver(object : DefaultLifecycleObserver {
+            override fun onStart(owner: LifecycleOwner) {
+                Log.d(TAG, "App brought to foreground, stopping vibration")
+                vibrator.stop()
+            }
+        })
+    }
 
     override fun onBind(intent: Intent): IBinder {
         if (!checkPermissions()) {
@@ -97,6 +112,9 @@ internal class DeviceSyncService : Service(), CoroutineScope {
         launch {
             syncCoordinator.state.collect { state ->
                 updateNotification(state)
+                if (state is SyncState.Disconnected) {
+                    vibrator.vibrate()
+                }
             }
         }
     }
@@ -159,6 +177,7 @@ internal class DeviceSyncService : Service(), CoroutineScope {
             return
         }
 
+        vibrator.vibrate()
         NotificationManagerCompat.from(this).notify(ERROR_NOTIFICATION_ID, notification)
     }
 

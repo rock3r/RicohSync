@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -21,13 +20,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import dev.sebastiano.ricohsync.devicesync.DeviceSyncScreen
-import dev.sebastiano.ricohsync.devicesync.DeviceSyncViewModel
+import dev.sebastiano.ricohsync.data.repository.DataStorePairedDevicesRepository
+import dev.sebastiano.ricohsync.data.repository.pairedDevicesDataStoreV2
+import dev.sebastiano.ricohsync.devices.DevicesListScreen
+import dev.sebastiano.ricohsync.devices.DevicesListViewModel
 import dev.sebastiano.ricohsync.devicesync.registerNotificationChannel
-import dev.sebastiano.ricohsync.domain.model.Camera
-import dev.sebastiano.ricohsync.proto.pairedDevicesDataStore
-import dev.sebastiano.ricohsync.scanning.ScanningScreen
-import dev.sebastiano.ricohsync.scanning.ScanningViewModel
+import dev.sebastiano.ricohsync.pairing.PairingScreen
+import dev.sebastiano.ricohsync.pairing.PairingViewModel
 import dev.sebastiano.ricohsync.ui.theme.RicohSyncTheme
 
 class MainActivity : ComponentActivity() {
@@ -37,39 +36,57 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         registerNotificationChannel(this)
 
-        val viewModel = MainViewModel(pairedDevicesDataStore)
-        setContent { RootComposable(viewModel, context = this) }
+        val pairedDevicesRepository = DataStorePairedDevicesRepository(pairedDevicesDataStoreV2)
+        val viewModel = MainViewModel(pairedDevicesRepository)
+
+        setContent {
+            RootComposable(
+                viewModel = viewModel,
+                pairedDevicesRepository = pairedDevicesRepository,
+                context = this,
+            )
+        }
     }
 }
 
 @Composable
-private fun RootComposable(mainViewModel: MainViewModel, context: Context) {
+private fun RootComposable(
+    viewModel: MainViewModel,
+    pairedDevicesRepository: DataStorePairedDevicesRepository,
+    context: Context,
+) {
     RicohSyncTheme {
-        val state by mainViewModel.mainState
-        when (val currentState = state) {
-            MainState.NeedsPermissions -> PermissionsScreen(mainViewModel)
+        val state by viewModel.mainState
 
-            MainState.Stopped -> StoppedScreen { mainViewModel.reconnect() }
-
-            MainState.NoDeviceSelected -> {
-                val scanningViewModel = remember { ScanningViewModel() }
-                ScanningScreen(scanningViewModel) { camera ->
-                    mainViewModel.saveSelectedDevice(camera)
-                }
+        when (state) {
+            MainState.NeedsPermissions -> {
+                PermissionsScreen(viewModel)
             }
 
-            is MainState.FindingDevice -> SearchingDevice(currentState.camera)
-
-            is MainState.DeviceFound -> {
-                val deviceSyncViewModel = remember {
-                    DeviceSyncViewModel(
-                        camera = currentState.camera,
-                        onDeviceDisconnected = { mainViewModel.onDeviceDisconnected() },
+            MainState.DevicesList -> {
+                val devicesListViewModel = remember {
+                    DevicesListViewModel(
+                        pairedDevicesRepository = pairedDevicesRepository,
                         bindingContextProvider = { context.applicationContext },
                     )
                 }
 
-                DeviceSyncScreen(deviceSyncViewModel)
+                DevicesListScreen(
+                    viewModel = devicesListViewModel,
+                    onAddDeviceClick = { viewModel.navigateToPairing() },
+                )
+            }
+
+            MainState.Pairing -> {
+                val pairingViewModel = remember {
+                    PairingViewModel(pairedDevicesRepository = pairedDevicesRepository)
+                }
+
+                PairingScreen(
+                    viewModel = pairingViewModel,
+                    onNavigateBack = { viewModel.navigateToDevicesList() },
+                    onDevicePaired = { viewModel.navigateToDevicesList() },
+                )
             }
         }
     }
@@ -78,48 +95,26 @@ private fun RootComposable(mainViewModel: MainViewModel, context: Context) {
 @Composable
 private fun PermissionsScreen(mainViewModel: MainViewModel) {
     PermissionsRequester(mainViewModel::onPermissionsGranted) { _, _, _, _, request ->
-        // TODO explain missing permissions
         Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
             Box(Modifier.fillMaxSize().padding(innerPadding), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("Please grant permissions")
+                    Text("RicohSync needs permissions to work")
                     Spacer(Modifier.height(8.dp))
-                    Button(request) { Text("Grant now") }
+                    Text(
+                        "• Location: To get GPS coordinates for your photos",
+                        modifier = Modifier.padding(horizontal = 32.dp),
+                    )
+                    Text(
+                        "• Bluetooth: To connect to your camera",
+                        modifier = Modifier.padding(horizontal = 32.dp),
+                    )
+                    Text(
+                        "• Notifications: To show sync status",
+                        modifier = Modifier.padding(horizontal = 32.dp),
+                    )
+                    Spacer(Modifier.height(16.dp))
+                    Button(request) { Text("Grant permissions") }
                 }
-            }
-        }
-    }
-}
-
-@Composable
-private fun StoppedScreen(onReconnect: () -> Unit) {
-    Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-        Box(Modifier.fillMaxSize().padding(innerPadding), contentAlignment = Alignment.Center) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("Stopped by user")
-                Spacer(Modifier.height(8.dp))
-                Button(onReconnect) { Text("Reconnect") }
-            }
-        }
-    }
-}
-
-@Composable
-private fun SearchingDevice(camera: Camera) {
-    Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-        Box(Modifier.fillMaxSize().padding(innerPadding), contentAlignment = Alignment.Center) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    "Looking for ${camera.name ?: "camera"}...",
-                    style = MaterialTheme.typography.titleLarge,
-                )
-
-                Spacer(Modifier.height(8.dp))
-
-                Text(
-                    camera.macAddress,
-                    style = MaterialTheme.typography.bodySmall,
-                )
             }
         }
     }

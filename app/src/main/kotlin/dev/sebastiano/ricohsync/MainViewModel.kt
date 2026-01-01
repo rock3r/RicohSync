@@ -2,105 +2,57 @@ package dev.sebastiano.ricohsync
 
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
-import androidx.datastore.core.DataStore
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import dev.sebastiano.ricohsync.domain.model.Camera
-import dev.sebastiano.ricohsync.proto.SelectedDevice
-import dev.sebastiano.ricohsync.proto.SelectedDevices
-import dev.sebastiano.ricohsync.vendors.ricoh.RicohCameraVendor
+import dev.sebastiano.ricohsync.domain.repository.PairedDevicesRepository
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
-import kotlinx.coroutines.launch
 
 /**
  * Main ViewModel that manages the app's navigation state.
+ *
+ * Handles permission state and navigation between:
+ * - Permissions screen (when permissions not granted)
+ * - Devices list screen (main screen with paired devices)
+ * - Pairing screen (for adding new devices)
  */
-class MainViewModel(private val dataStore: DataStore<SelectedDevices>) : ViewModel() {
+class MainViewModel(
+    private val pairedDevicesRepository: PairedDevicesRepository,
+) : ViewModel() {
 
     private val _mainState = mutableStateOf<MainState>(MainState.NeedsPermissions)
     val mainState: MutableState<MainState> = _mainState
 
-    /** Saves the selected device to persistent storage. */
-    fun saveSelectedDevice(camera: Camera) {
-        viewModelScope.launch(Dispatchers.IO) {
-            dataStore.updateData {
-                SelectedDevices.newBuilder()
-                    .setSelectedDevice(
-                        SelectedDevice.newBuilder()
-                            .setMacAddress(camera.macAddress)
-                            .setName(camera.name)
-                            .build()
-                    )
-                    .setHasSelectedDevice(true)
-                    .build()
-            }
-        }
-    }
-
     /** Called when all required permissions have been granted. */
     fun onPermissionsGranted() {
-        dataStore.data
-            .onEach { selectedDevices ->
-                val selectedDevice =
-                    if (selectedDevices.hasSelectedDevice) selectedDevices.selectedDevice else null
-                updateMainState(selectedDevice)
-            }
-            .flowOn(Dispatchers.IO)
-            .launchIn(viewModelScope)
+        // Once permissions are granted, go to device list
+        // The DevicesListViewModel will handle showing empty state or devices
+        _mainState.value = MainState.DevicesList
     }
 
-    private suspend fun updateMainState(selectedDevice: SelectedDevice?) {
-        if (selectedDevice != null) {
-            _mainState.value = MainState.FindingDevice(selectedDevice.toCamera())
-            // Once the device is found during sync, the DeviceSyncViewModel will handle it
-            _mainState.value = MainState.DeviceFound(selectedDevice.toCamera())
-        } else {
-            _mainState.value = MainState.NoDeviceSelected
-        }
+    /** Navigate to the pairing screen. */
+    fun navigateToPairing() {
+        _mainState.value = MainState.Pairing
     }
 
-    /** Called when the camera disconnects. */
-    fun onDeviceDisconnected() {
-        viewModelScope.launch { updateMainState(dataStore.data.first().selectedDevice) }
+    /** Navigate back to the devices list. */
+    fun navigateToDevicesList() {
+        _mainState.value = MainState.DevicesList
     }
-
-    /** Attempts to reconnect to the previously selected camera. */
-    fun reconnect() {
-        onDeviceDisconnected()
-    }
-
-    /**
-     * Converts a stored SelectedDevice to a Camera.
-     *
-     * Note: For backward compatibility, this defaults to Ricoh vendor since the app
-     * was originally Ricoh-only. Future versions could store vendor information.
-     */
-    private fun SelectedDevice.toCamera(): Camera = Camera(
-        identifier = macAddress,
-        name = name,
-        macAddress = macAddress,
-        vendor = RicohCameraVendor, // Default to Ricoh for backward compatibility
-    )
 }
 
-/** Main navigation state of the app. */
+/**
+ * Main navigation state of the app.
+ */
 sealed interface MainState {
     /** Permissions need to be requested. */
     data object NeedsPermissions : MainState
 
-    /** No device has been selected yet. */
-    data object NoDeviceSelected : MainState
+    /** Main screen showing paired devices list. */
+    data object DevicesList : MainState
 
-    /** User has stopped the sync. */
-    data object Stopped : MainState
-
-    /** Searching for the previously selected device. */
-    data class FindingDevice(val camera: Camera) : MainState
-
-    /** Device found, ready to sync. */
-    data class DeviceFound(val camera: Camera) : MainState
+    /** Pairing screen for adding new devices. */
+    data object Pairing : MainState
 }
