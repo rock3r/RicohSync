@@ -29,12 +29,13 @@ class DefaultLocationCollectorTest {
     private lateinit var testScope: TestScope
     private lateinit var locationCollector: DefaultLocationCollector
 
-    private val testLocation = GpsLocation(
-        latitude = 37.7749,
-        longitude = -122.4194,
-        altitude = 10.0,
-        timestamp = ZonedDateTime.of(2024, 12, 25, 14, 30, 0, 0, ZoneId.of("UTC")),
-    )
+    private val testLocation =
+        GpsLocation(
+            latitude = 37.7749,
+            longitude = -122.4194,
+            altitude = 10.0,
+            timestamp = ZonedDateTime.of(2024, 12, 25, 14, 30, 0, 0, ZoneId.of("UTC")),
+        )
 
     @Before
     fun setUp() {
@@ -45,10 +46,11 @@ class DefaultLocationCollectorTest {
         locationRepository = FakeLocationRepository()
         testScope = TestScope(UnconfinedTestDispatcher())
 
-        locationCollector = DefaultLocationCollector(
-            locationRepository = locationRepository,
-            coroutineScope = testScope.backgroundScope,
-        )
+        locationCollector =
+            DefaultLocationCollector(
+                locationRepository = locationRepository,
+                coroutineScope = testScope.backgroundScope,
+            )
     }
 
     @After
@@ -58,106 +60,115 @@ class DefaultLocationCollectorTest {
     }
 
     @Test
-    fun `initial state is not collecting`() = testScope.runTest {
-        assertFalse(locationCollector.isCollecting.value)
-        assertNull(locationCollector.locationUpdates.value)
-        assertEquals(0, locationCollector.getRegisteredDeviceCount())
-    }
+    fun `initial state is not collecting`() =
+        testScope.runTest {
+            assertFalse(locationCollector.isCollecting.value)
+            assertNull(locationCollector.locationUpdates.value)
+            assertEquals(0, locationCollector.getRegisteredDeviceCount())
+        }
 
     @Test
-    fun `startCollecting starts location updates`() = testScope.runTest {
-        locationCollector.startCollecting()
-        advanceUntilIdle()
+    fun `startCollecting starts location updates`() =
+        testScope.runTest {
+            locationCollector.startCollecting()
+            advanceUntilIdle()
 
-        assertTrue(locationCollector.isCollecting.value)
-        assertTrue(locationRepository.startLocationUpdatesCalled)
-    }
-
-    @Test
-    fun `stopCollecting stops location updates`() = testScope.runTest {
-        locationCollector.startCollecting()
-        advanceUntilIdle()
-
-        locationCollector.stopCollecting()
-        advanceUntilIdle()
-
-        assertFalse(locationCollector.isCollecting.value)
-        assertTrue(locationRepository.stopLocationUpdatesCalled)
-    }
+            assertTrue(locationCollector.isCollecting.value)
+            assertTrue(locationRepository.startLocationUpdatesCalled)
+        }
 
     @Test
-    fun `location updates are forwarded`() = testScope.runTest {
-        locationCollector.startCollecting()
-        advanceUntilIdle()
+    fun `stopCollecting stops location updates`() =
+        testScope.runTest {
+            locationCollector.startCollecting()
+            advanceUntilIdle()
 
-        locationRepository.emit(testLocation)
-        advanceUntilIdle()
+            locationCollector.stopCollecting()
+            advanceUntilIdle()
 
-        assertEquals(testLocation, locationCollector.locationUpdates.value)
-    }
-
-    @Test
-    fun `registerDevice starts collecting if not already`() = testScope.runTest {
-        assertFalse(locationCollector.isCollecting.value)
-
-        locationCollector.registerDevice("device1")
-        advanceUntilIdle()
-
-        assertTrue(locationCollector.isCollecting.value)
-        assertEquals(1, locationCollector.getRegisteredDeviceCount())
-    }
+            assertFalse(locationCollector.isCollecting.value)
+            assertTrue(locationRepository.stopLocationUpdatesCalled)
+        }
 
     @Test
-    fun `registerDevice multiple devices`() = testScope.runTest {
-        locationCollector.registerDevice("device1")
-        locationCollector.registerDevice("device2")
-        locationCollector.registerDevice("device3")
+    fun `location updates are forwarded`() =
+        testScope.runTest {
+            locationCollector.startCollecting()
+            advanceUntilIdle()
 
-        assertEquals(3, locationCollector.getRegisteredDeviceCount())
-    }
+            locationRepository.emit(testLocation)
+            advanceUntilIdle()
 
-    @Test
-    fun `unregisterDevice decreases count`() = testScope.runTest {
-        locationCollector.registerDevice("device1")
-        locationCollector.registerDevice("device2")
-        assertEquals(2, locationCollector.getRegisteredDeviceCount())
-
-        locationCollector.unregisterDevice("device1")
-        assertEquals(1, locationCollector.getRegisteredDeviceCount())
-    }
+            assertEquals(testLocation, locationCollector.locationUpdates.value)
+        }
 
     @Test
-    fun `unregisterDevice stops collecting when no devices left`() = testScope.runTest {
-        locationCollector.registerDevice("device1")
-        advanceUntilIdle()
-        assertTrue(locationCollector.isCollecting.value)
+    fun `registerDevice starts collecting if not already`() =
+        testScope.runTest {
+            assertFalse(locationCollector.isCollecting.value)
 
-        locationCollector.unregisterDevice("device1")
-        advanceUntilIdle()
+            locationCollector.registerDevice("device1")
+            advanceUntilIdle()
 
-        assertFalse(locationCollector.isCollecting.value)
-        assertEquals(0, locationCollector.getRegisteredDeviceCount())
-    }
-
-    @Test
-    fun `duplicate registrations are counted as single device`() = testScope.runTest {
-        locationCollector.registerDevice("device1")
-        locationCollector.registerDevice("device1") // Duplicate
-        locationCollector.registerDevice("device1") // Duplicate
-
-        // ConcurrentHashMap.newKeySet() prevents duplicates
-        assertEquals(1, locationCollector.getRegisteredDeviceCount())
-    }
+            assertTrue(locationCollector.isCollecting.value)
+            assertEquals(1, locationCollector.getRegisteredDeviceCount())
+        }
 
     @Test
-    fun `startCollecting is idempotent`() = testScope.runTest {
-        locationCollector.startCollecting()
-        locationCollector.startCollecting() // Should be ignored
-        locationCollector.startCollecting() // Should be ignored
-        advanceUntilIdle()
+    fun `registerDevice multiple devices`() =
+        testScope.runTest {
+            locationCollector.registerDevice("device1")
+            locationCollector.registerDevice("device2")
+            locationCollector.registerDevice("device3")
 
-        assertTrue(locationCollector.isCollecting.value)
-        // Only one call to start should have happened
-    }
+            assertEquals(3, locationCollector.getRegisteredDeviceCount())
+        }
+
+    @Test
+    fun `unregisterDevice decreases count`() =
+        testScope.runTest {
+            locationCollector.registerDevice("device1")
+            locationCollector.registerDevice("device2")
+            assertEquals(2, locationCollector.getRegisteredDeviceCount())
+
+            locationCollector.unregisterDevice("device1")
+            assertEquals(1, locationCollector.getRegisteredDeviceCount())
+        }
+
+    @Test
+    fun `unregisterDevice stops collecting when no devices left`() =
+        testScope.runTest {
+            locationCollector.registerDevice("device1")
+            advanceUntilIdle()
+            assertTrue(locationCollector.isCollecting.value)
+
+            locationCollector.unregisterDevice("device1")
+            advanceUntilIdle()
+
+            assertFalse(locationCollector.isCollecting.value)
+            assertEquals(0, locationCollector.getRegisteredDeviceCount())
+        }
+
+    @Test
+    fun `duplicate registrations are counted as single device`() =
+        testScope.runTest {
+            locationCollector.registerDevice("device1")
+            locationCollector.registerDevice("device1") // Duplicate
+            locationCollector.registerDevice("device1") // Duplicate
+
+            // ConcurrentHashMap.newKeySet() prevents duplicates
+            assertEquals(1, locationCollector.getRegisteredDeviceCount())
+        }
+
+    @Test
+    fun `startCollecting is idempotent`() =
+        testScope.runTest {
+            locationCollector.startCollecting()
+            locationCollector.startCollecting() // Should be ignored
+            locationCollector.startCollecting() // Should be ignored
+            advanceUntilIdle()
+
+            assertTrue(locationCollector.isCollecting.value)
+            // Only one call to start should have happened
+        }
 }
-

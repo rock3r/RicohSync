@@ -28,16 +28,16 @@ object RicohCameraVendor : CameraVendor {
 
     override fun recognizesDevice(deviceName: String?, serviceUuids: List<Uuid>): Boolean {
         // Ricoh cameras advertise a specific service UUID
-        val hasRicohService = serviceUuids.any { uuid ->
-            RicohGattSpec.scanFilterServiceUuids.contains(uuid)
-        }
+        val hasRicohService =
+            serviceUuids.any { uuid -> RicohGattSpec.scanFilterServiceUuids.contains(uuid) }
 
         // Additional check: device name typically starts with "GR" or "RICOH"
-        val hasRicohName = deviceName?.let { name ->
-            RicohGattSpec.scanFilterDeviceNames.any { prefix ->
-                name.startsWith(prefix, ignoreCase = true)
-            }
-        } ?: false
+        val hasRicohName =
+            deviceName?.let { name ->
+                RicohGattSpec.scanFilterDeviceNames.any { prefix ->
+                    name.startsWith(prefix, ignoreCase = true)
+                }
+            } ?: false
 
         // Accept device if it has the Ricoh service UUID or a recognized name
         return hasRicohService || hasRicohName

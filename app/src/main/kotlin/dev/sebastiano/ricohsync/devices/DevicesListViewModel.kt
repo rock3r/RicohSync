@@ -12,7 +12,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.sebastiano.ricohsync.devicesync.MultiDeviceSyncService
 import dev.sebastiano.ricohsync.domain.model.DeviceConnectionState
-import dev.sebastiano.ricohsync.domain.model.PairedDevice
 import dev.sebastiano.ricohsync.domain.model.PairedDeviceWithState
 import dev.sebastiano.ricohsync.domain.repository.PairedDevicesRepository
 import kotlinx.coroutines.Dispatchers
@@ -26,8 +25,8 @@ private const val TAG = "DevicesListViewModel"
 /**
  * ViewModel for the devices list screen.
  *
- * Manages the list of paired devices and their connection states.
- * Communicates with the [MultiDeviceSyncService] to control device sync.
+ * Manages the list of paired devices and their connection states. Communicates with the
+ * [MultiDeviceSyncService] to control device sync.
  */
 class DevicesListViewModel(
     private val pairedDevicesRepository: PairedDevicesRepository,
@@ -39,7 +38,8 @@ class DevicesListViewModel(
 
     private var service: MultiDeviceSyncService? = null
     private var serviceConnection: ServiceConnection? = null
-    private val deviceStatesFromService = MutableStateFlow<Map<String, DeviceConnectionState>>(emptyMap())
+    private val deviceStatesFromService =
+        MutableStateFlow<Map<String, DeviceConnectionState>>(emptyMap())
     private val isScanningFromService = MutableStateFlow(false)
     private var stateCollectionJob: Job? = null
     private var scanningCollectionJob: Job? = null
@@ -52,28 +52,30 @@ class DevicesListViewModel(
     private fun observeDevices() {
         viewModelScope.launch(Dispatchers.IO) {
             combine(
-                pairedDevicesRepository.pairedDevices,
-                deviceStatesFromService,
-                isScanningFromService,
-            ) { pairedDevices, connectionStates, isScanning ->
-                if (pairedDevices.isEmpty()) {
-                    DevicesListState.Empty
-                } else {
-                    DevicesListState.HasDevices(
-                        devices = pairedDevices.map { device ->
-                            val connectionState = when {
-                                !device.isEnabled -> DeviceConnectionState.Disabled
-                                else -> connectionStates[device.macAddress]
-                                    ?: DeviceConnectionState.Disconnected
-                            }
-                            PairedDeviceWithState(device, connectionState)
-                        },
-                        isScanning = isScanning,
-                    )
+                    pairedDevicesRepository.pairedDevices,
+                    deviceStatesFromService,
+                    isScanningFromService,
+                ) { pairedDevices, connectionStates, isScanning ->
+                    if (pairedDevices.isEmpty()) {
+                        DevicesListState.Empty
+                    } else {
+                        DevicesListState.HasDevices(
+                            devices =
+                                pairedDevices.map { device ->
+                                    val connectionState =
+                                        when {
+                                            !device.isEnabled -> DeviceConnectionState.Disabled
+                                            else ->
+                                                connectionStates[device.macAddress]
+                                                    ?: DeviceConnectionState.Disconnected
+                                        }
+                                    PairedDeviceWithState(device, connectionState)
+                                },
+                            isScanning = isScanning,
+                        )
+                    }
                 }
-            }.collect { newState ->
-                _state.value = newState
-            }
+                .collect { newState -> _state.value = newState }
         }
     }
 
@@ -89,44 +91,46 @@ class DevicesListViewModel(
                 }
             }
 
-            val connection = object : ServiceConnection {
-                override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
-                    Log.i(TAG, "Connected to MultiDeviceSyncService")
-                    service = MultiDeviceSyncService.getInstanceFrom(binder as android.os.Binder)
+            val connection =
+                object : ServiceConnection {
+                    override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
+                        Log.i(TAG, "Connected to MultiDeviceSyncService")
+                        service =
+                            MultiDeviceSyncService.getInstanceFrom(binder as android.os.Binder)
 
-                    // Observe device states from service
-                    stateCollectionJob = viewModelScope.launch(Dispatchers.IO) {
-                        service?.deviceStates?.collect { states ->
-                            deviceStatesFromService.value = states
-                        }
+                        // Observe device states from service
+                        stateCollectionJob =
+                            viewModelScope.launch(Dispatchers.IO) {
+                                service?.deviceStates?.collect { states ->
+                                    deviceStatesFromService.value = states
+                                }
+                            }
+
+                        // Observe scanning state from service
+                        scanningCollectionJob =
+                            viewModelScope.launch(Dispatchers.IO) {
+                                service?.isScanning?.collect { isScanning ->
+                                    isScanningFromService.value = isScanning
+                                }
+                            }
                     }
 
-                    // Observe scanning state from service
-                    scanningCollectionJob = viewModelScope.launch(Dispatchers.IO) {
-                        service?.isScanning?.collect { isScanning ->
-                            isScanningFromService.value = isScanning
-                        }
+                    override fun onServiceDisconnected(name: ComponentName?) {
+                        Log.i(TAG, "Disconnected from MultiDeviceSyncService")
+                        service = null
+                        stateCollectionJob?.cancel()
+                        scanningCollectionJob?.cancel()
+                        deviceStatesFromService.value = emptyMap()
+                        isScanningFromService.value = false
                     }
                 }
-
-                override fun onServiceDisconnected(name: ComponentName?) {
-                    Log.i(TAG, "Disconnected from MultiDeviceSyncService")
-                    service = null
-                    stateCollectionJob?.cancel()
-                    scanningCollectionJob?.cancel()
-                    deviceStatesFromService.value = emptyMap()
-                    isScanningFromService.value = false
-                }
-            }
 
             serviceConnection = connection
             context.bindService(intent, connection, Context.BIND_AUTO_CREATE)
         }
     }
 
-    /**
-     * Sets whether a device is enabled for sync.
-     */
+    /** Sets whether a device is enabled for sync. */
     fun setDeviceEnabled(macAddress: String, enabled: Boolean) {
         viewModelScope.launch(Dispatchers.IO) {
             pairedDevicesRepository.setDeviceEnabled(macAddress, enabled)
@@ -139,9 +143,7 @@ class DevicesListViewModel(
         }
     }
 
-    /**
-     * Unpairs (removes) a device.
-     */
+    /** Unpairs (removes) a device. */
     fun unpairDevice(macAddress: String) {
         viewModelScope.launch(Dispatchers.IO) {
             // First disconnect if connected
@@ -152,9 +154,7 @@ class DevicesListViewModel(
         }
     }
 
-    /**
-     * Retries connection to a failed device.
-     */
+    /** Retries connection to a failed device. */
     fun retryConnection(macAddress: String) {
         viewModelScope.launch(Dispatchers.IO) {
             val device = pairedDevicesRepository.getDevice(macAddress) ?: return@launch
@@ -162,9 +162,7 @@ class DevicesListViewModel(
         }
     }
 
-    /**
-     * Manually triggers a scan for all enabled but disconnected devices.
-     */
+    /** Manually triggers a scan for all enabled but disconnected devices. */
     fun refreshConnections() {
         viewModelScope.launch(Dispatchers.IO) {
             val context = bindingContextProvider()
@@ -187,9 +185,7 @@ class DevicesListViewModel(
     }
 }
 
-/**
- * UI state for the devices list screen.
- */
+/** UI state for the devices list screen. */
 sealed interface DevicesListState {
     /** Loading devices from storage. */
     data object Loading : DevicesListState
@@ -203,4 +199,3 @@ sealed interface DevicesListState {
         val isScanning: Boolean = false,
     ) : DevicesListState
 }
-

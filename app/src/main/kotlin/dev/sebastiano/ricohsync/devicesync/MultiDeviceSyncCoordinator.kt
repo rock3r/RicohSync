@@ -10,30 +10,29 @@ import dev.sebastiano.ricohsync.domain.model.PairedDevice
 import dev.sebastiano.ricohsync.domain.model.toCamera
 import dev.sebastiano.ricohsync.domain.repository.CameraConnection
 import dev.sebastiano.ricohsync.domain.repository.CameraRepository
+import dev.sebastiano.ricohsync.domain.repository.PairedDevicesRepository
 import dev.sebastiano.ricohsync.domain.vendor.CameraVendorRegistry
 import java.time.ZonedDateTime
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeout
-import kotlinx.coroutines.TimeoutCancellationException
 
 private const val TAG = "MultiDeviceSyncCoordinator"
 private const val PERIODIC_SCAN_INTERVAL_MS = 60_000L // 1 minute
@@ -50,6 +49,7 @@ private const val PERIODIC_SCAN_INTERVAL_MS = 60_000L // 1 minute
  * @param cameraRepository Repository for BLE camera operations.
  * @param locationCollector Centralized location collector.
  * @param vendorRegistry Registry for resolving camera vendors.
+ * @param pairedDevicesRepository Repository for managing paired devices.
  * @param coroutineScope Scope for launching coroutines.
  * @param deviceNameProvider Provider for the device name to set on cameras.
  */
@@ -57,25 +57,23 @@ class MultiDeviceSyncCoordinator(
     private val cameraRepository: CameraRepository,
     private val locationCollector: LocationCollectionCoordinator,
     private val vendorRegistry: CameraVendorRegistry,
+    private val pairedDevicesRepository: PairedDevicesRepository,
     private val coroutineScope: CoroutineScope,
     private val deviceNameProvider: () -> String = { "${Build.MODEL} RicohSync" },
 ) {
     private val _deviceStates = MutableStateFlow<Map<String, DeviceConnectionState>>(emptyMap())
 
-    /**
-     * Flow of connection states for all managed devices.
-     * Key is the device MAC address.
-     */
+    /** Flow of connection states for all managed devices. Key is the device MAC address. */
     val deviceStates: StateFlow<Map<String, DeviceConnectionState>> = _deviceStates.asStateFlow()
 
     private val _isScanning = MutableStateFlow(false)
 
-    /**
-     * Flow that emits true when a scan/discovery pass is in progress.
-     */
-    val isScanning: StateFlow<Boolean> = combine(_isScanning, _deviceStates) { scanning, states ->
-        scanning || states.values.any { it is DeviceConnectionState.Connecting }
-    }.stateIn(coroutineScope, SharingStarted.Eagerly, false)
+    /** Flow that emits true when a scan/discovery pass is in progress. */
+    val isScanning: StateFlow<Boolean> =
+        combine(_isScanning, _deviceStates) { scanning, states ->
+                scanning || states.values.any { it is DeviceConnectionState.Connecting }
+            }
+            .stateIn(coroutineScope, SharingStarted.Eagerly, false)
 
     private val deviceJobs = mutableMapOf<String, Job>()
     private val deviceConnections = mutableMapOf<String, CameraConnection>()
@@ -87,42 +85,39 @@ class MultiDeviceSyncCoordinator(
     private val enabledDevicesFlow = MutableStateFlow<List<PairedDevice>>(emptyList())
 
     /**
-     * Starts background monitoring of enabled devices.
-     * This will periodically scan for and connect to devices that are enabled but not connected.
+     * Starts background monitoring of enabled devices. This will periodically scan for and connect
+     * to devices that are enabled but not connected.
      *
      * @param enabledDevices Flow of enabled devices from the repository.
      */
     fun startBackgroundMonitoring(enabledDevices: Flow<List<PairedDevice>>) {
         if (backgroundMonitoringJob != null) return
 
-        backgroundMonitoringJob = coroutineScope.launch {
-            // Job for observing enabled devices
-            launch {
-                enabledDevices.collect { devices ->
-                    enabledDevicesFlow.value = devices
-                    checkAndConnectEnabledDevices()
+        backgroundMonitoringJob =
+            coroutineScope.launch {
+                // Job for observing enabled devices
+                launch {
+                    enabledDevices.collect { devices ->
+                        enabledDevicesFlow.value = devices
+                        checkAndConnectEnabledDevices()
+                    }
                 }
-            }
 
-            // Job for periodic scanning
-            launch {
-                while (true) {
-                    delay(PERIODIC_SCAN_INTERVAL_MS)
-                    Log.d(TAG, "Running periodic scan for enabled devices...")
-                    checkAndConnectEnabledDevices()
+                // Job for periodic scanning
+                launch {
+                    while (true) {
+                        delay(PERIODIC_SCAN_INTERVAL_MS)
+                        Log.d(TAG, "Running periodic scan for enabled devices...")
+                        checkAndConnectEnabledDevices()
+                    }
                 }
             }
-        }
     }
 
-    /**
-     * Manually triggers a scan for all enabled but disconnected devices.
-     */
+    /** Manually triggers a scan for all enabled but disconnected devices. */
     fun refreshConnections() {
         Log.i(TAG, "Manual refresh requested")
-        coroutineScope.launch {
-            checkAndConnectEnabledDevices()
-        }
+        coroutineScope.launch { checkAndConnectEnabledDevices() }
     }
 
     private suspend fun checkAndConnectEnabledDevices() {
@@ -134,11 +129,13 @@ class MultiDeviceSyncCoordinator(
                     val macAddress = device.macAddress
                     val state = getDeviceState(macAddress)
 
-                    if (state is DeviceConnectionState.Disconnected ||
-                        (state is DeviceConnectionState.Error && state.isRecoverable)) {
+                    if (
+                        state is DeviceConnectionState.Disconnected ||
+                            (state is DeviceConnectionState.Error && state.isRecoverable)
+                    ) {
                         Log.d(
                             TAG,
-                            "Device $macAddress is enabled but not connected (state: $state), attempting sync..."
+                            "Device $macAddress is enabled but not connected (state: $state), attempting sync...",
                         )
                         startDeviceSync(device)
                     }
@@ -195,9 +192,7 @@ class MultiDeviceSyncCoordinator(
                         locationCollector.registerDevice(macAddress)
 
                         Log.d(TAG, "Starting connection attempt for $macAddress...")
-                        val connection = withTimeout(30_000L) {
-                            connectToCamera(camera)
-                        }
+                        val connection = withTimeout(30_000L) { connectToCamera(camera) }
 
                         jobsMutex.withLock { deviceConnections[macAddress] = connection }
 
@@ -263,14 +258,15 @@ class MultiDeviceSyncCoordinator(
         val capabilities = connection.camera.vendor.getCapabilities()
 
         // Read firmware version if supported
-        val firmwareVersion = if (capabilities.supportsFirmwareVersion) {
-            try {
-                connection.readFirmwareVersion()
-            } catch (e: Exception) {
-                Log.w(TAG, "Failed to read firmware version", e)
-                null
-            }
-        } else null
+        val firmwareVersion =
+            if (capabilities.supportsFirmwareVersion) {
+                try {
+                    connection.readFirmwareVersion()
+                } catch (e: Exception) {
+                    Log.w(TAG, "Failed to read firmware version", e)
+                    null
+                }
+            } else null
 
         // Set paired device name if supported
         if (capabilities.supportsDeviceName) {
@@ -303,24 +299,21 @@ class MultiDeviceSyncCoordinator(
     }
 
     /**
-     * Ensures the global location sync job is running.
-     * This job broadcasts location updates to all connected devices.
+     * Ensures the global location sync job is running. This job broadcasts location updates to all
+     * connected devices.
      */
     private fun ensureLocationSyncRunning() {
         if (locationSyncJob != null) return
 
-        locationSyncJob = coroutineScope.launch {
-            locationCollector.locationUpdates
-                .filterNotNull()
-                .collect { location ->
+        locationSyncJob =
+            coroutineScope.launch {
+                locationCollector.locationUpdates.filterNotNull().collect { location ->
                     syncLocationToAllDevices(location)
                 }
-        }
+            }
     }
 
-    /**
-     * Syncs a location update to all connected devices.
-     */
+    /** Syncs a location update to all connected devices. */
     private suspend fun syncLocationToAllDevices(location: GpsLocation) {
         val connections = jobsMutex.withLock { deviceConnections.toMap() }
 
@@ -329,22 +322,30 @@ class MultiDeviceSyncCoordinator(
                 if (connection.camera.vendor.getCapabilities().supportsLocationSync) {
                     connection.syncLocation(location)
 
+                    // Update persistent last sync timestamp
+                    val now = System.currentTimeMillis()
+                    pairedDevicesRepository.updateLastSyncedAt(macAddress, now)
+
                     // Update state with sync info
                     updateDeviceState(macAddress) { currentState ->
                         when (currentState) {
-                            is DeviceConnectionState.Syncing -> currentState.copy(
-                                lastSyncInfo = LocationSyncInfo(
-                                    syncTime = ZonedDateTime.now(),
-                                    location = location,
-                                ),
-                            )
-                            is DeviceConnectionState.Connected -> DeviceConnectionState.Syncing(
-                                firmwareVersion = currentState.firmwareVersion,
-                                lastSyncInfo = LocationSyncInfo(
-                                    syncTime = ZonedDateTime.now(),
-                                    location = location,
-                                ),
-                            )
+                            is DeviceConnectionState.Syncing ->
+                                currentState.copy(
+                                    lastSyncInfo =
+                                        LocationSyncInfo(
+                                            syncTime = ZonedDateTime.now(),
+                                            location = location,
+                                        )
+                                )
+                            is DeviceConnectionState.Connected ->
+                                DeviceConnectionState.Syncing(
+                                    firmwareVersion = currentState.firmwareVersion,
+                                    lastSyncInfo =
+                                        LocationSyncInfo(
+                                            syncTime = ZonedDateTime.now(),
+                                            location = location,
+                                        ),
+                                )
                             else -> currentState
                         }
                     }
@@ -364,9 +365,7 @@ class MultiDeviceSyncCoordinator(
     suspend fun stopDeviceSync(macAddress: String) {
         Log.i(TAG, "Stopping sync for $macAddress")
 
-        val job = synchronized(deviceJobs) {
-            deviceJobs[macAddress]
-        }
+        val job = synchronized(deviceJobs) { deviceJobs[macAddress] }
 
         if (job != null) {
             job.cancel()
@@ -374,18 +373,14 @@ class MultiDeviceSyncCoordinator(
         }
     }
 
-    /**
-     * Stops syncing with all devices and stops background monitoring.
-     */
+    /** Stops syncing with all devices and stops background monitoring. */
     suspend fun stopAllDevices() {
         Log.i(TAG, "Stopping all device syncs")
 
         backgroundMonitoringJob?.cancel()
         backgroundMonitoringJob = null
 
-        val jobs = synchronized(deviceJobs) {
-            deviceJobs.values.toList()
-        }
+        val jobs = synchronized(deviceJobs) { deviceJobs.values.toList() }
 
         // Cancel all jobs
         jobs.forEach { it.cancel() }
@@ -398,15 +393,14 @@ class MultiDeviceSyncCoordinator(
 
     /**
      * Cleans up resources for a device.
-     * 
+     *
      * @param macAddress The MAC address of the device to clean up.
-     * @param preserveErrorState If true, won't update state to Disconnected if currently in Error state.
+     * @param preserveErrorState If true, won't update state to Disconnected if currently in Error
+     *   state.
      */
     private suspend fun cleanup(macAddress: String, preserveErrorState: Boolean = false) {
         // Remove job from tracking
-        synchronized(deviceJobs) {
-            deviceJobs.remove(macAddress)
-        }
+        synchronized(deviceJobs) { deviceJobs.remove(macAddress) }
 
         // Disconnect and remove connection
         jobsMutex.withLock {
@@ -436,36 +430,26 @@ class MultiDeviceSyncCoordinator(
         }
     }
 
-    /**
-     * Gets the current connection state for a device.
-     */
+    /** Gets the current connection state for a device. */
     fun getDeviceState(macAddress: String): DeviceConnectionState {
         return _deviceStates.value[macAddress] ?: DeviceConnectionState.Disconnected
     }
 
-    /**
-     * Checks if a device is currently connected.
-     */
+    /** Checks if a device is currently connected. */
     fun isDeviceConnected(macAddress: String): Boolean {
         val state = getDeviceState(macAddress)
-        return state is DeviceConnectionState.Connected ||
-            state is DeviceConnectionState.Syncing
+        return state is DeviceConnectionState.Connected || state is DeviceConnectionState.Syncing
     }
 
-    /**
-     * Gets the count of currently connected devices.
-     */
+    /** Gets the count of currently connected devices. */
     fun getConnectedDeviceCount(): Int {
         return _deviceStates.value.count { (_, state) ->
-            state is DeviceConnectionState.Connected ||
-                state is DeviceConnectionState.Syncing
+            state is DeviceConnectionState.Connected || state is DeviceConnectionState.Syncing
         }
     }
 
     private fun updateDeviceState(macAddress: String, state: DeviceConnectionState) {
-        _deviceStates.update { currentStates ->
-            currentStates + (macAddress to state)
-        }
+        _deviceStates.update { currentStates -> currentStates + (macAddress to state) }
     }
 
     private inline fun updateDeviceState(
@@ -478,18 +462,12 @@ class MultiDeviceSyncCoordinator(
         }
     }
 
-    /**
-     * Removes a device state entry (used when device is unpaired).
-     */
+    /** Removes a device state entry (used when device is unpaired). */
     fun clearDeviceState(macAddress: String) {
-        _deviceStates.update { currentStates ->
-            currentStates - macAddress
-        }
+        _deviceStates.update { currentStates -> currentStates - macAddress }
     }
 
-    /**
-     * Attempts to reconnect to a device that failed.
-     */
+    /** Attempts to reconnect to a device that failed. */
     fun retryDeviceConnection(device: PairedDevice) {
         val macAddress = device.macAddress
         val currentState = getDeviceState(macAddress)
@@ -501,9 +479,7 @@ class MultiDeviceSyncCoordinator(
     }
 
     companion object {
-        /**
-         * Suspends until cancellation. Used to keep a coroutine alive.
-         */
+        /** Suspends until cancellation. Used to keep a coroutine alive. */
         private suspend fun awaitCancellation(): Nothing {
             while (true) {
                 delay(Long.MAX_VALUE)

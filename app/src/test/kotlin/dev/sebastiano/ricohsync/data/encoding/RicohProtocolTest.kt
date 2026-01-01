@@ -74,24 +74,26 @@ class RicohProtocolTest {
 
     @Test
     fun `encodeLocation produces correct byte array size`() {
-        val location = GpsLocation(
-            latitude = 37.7749,
-            longitude = -122.4194,
-            altitude = 10.0,
-            timestamp = ZonedDateTime.of(2024, 12, 25, 14, 30, 45, 0, ZoneId.of("UTC")),
-        )
+        val location =
+            GpsLocation(
+                latitude = 37.7749,
+                longitude = -122.4194,
+                altitude = 10.0,
+                timestamp = ZonedDateTime.of(2024, 12, 25, 14, 30, 45, 0, ZoneId.of("UTC")),
+            )
         val encoded = RicohProtocol.encodeLocation(location)
         assertEquals(RicohProtocol.LOCATION_SIZE, encoded.size)
     }
 
     @Test
     fun `encodeLocation and decodeLocation are inverse operations`() {
-        val location = GpsLocation(
-            latitude = 37.7749,
-            longitude = -122.4194,
-            altitude = 10.5,
-            timestamp = ZonedDateTime.of(2024, 12, 25, 14, 30, 45, 0, ZoneId.of("UTC")),
-        )
+        val location =
+            GpsLocation(
+                latitude = 37.7749,
+                longitude = -122.4194,
+                altitude = 10.5,
+                timestamp = ZonedDateTime.of(2024, 12, 25, 14, 30, 45, 0, ZoneId.of("UTC")),
+            )
 
         val encoded = RicohProtocol.encodeLocation(location)
         val decoded = RicohProtocol.decodeLocation(encoded)
@@ -110,32 +112,35 @@ class RicohProtocolTest {
     @Test
     fun `encodeLocation handles extreme coordinates`() {
         // North Pole
-        val northPole = GpsLocation(
-            latitude = 90.0,
-            longitude = 0.0,
-            altitude = 0.0,
-            timestamp = ZonedDateTime.of(2024, 1, 1, 0, 0, 0, 0, ZoneId.of("UTC")),
-        )
+        val northPole =
+            GpsLocation(
+                latitude = 90.0,
+                longitude = 0.0,
+                altitude = 0.0,
+                timestamp = ZonedDateTime.of(2024, 1, 1, 0, 0, 0, 0, ZoneId.of("UTC")),
+            )
         val decodedNorth = RicohProtocol.decodeLocation(RicohProtocol.encodeLocation(northPole))
         assertEquals(90.0, decodedNorth.latitude, 0.0001)
 
         // South Pole
-        val southPole = GpsLocation(
-            latitude = -90.0,
-            longitude = 0.0,
-            altitude = 0.0,
-            timestamp = ZonedDateTime.of(2024, 1, 1, 0, 0, 0, 0, ZoneId.of("UTC")),
-        )
+        val southPole =
+            GpsLocation(
+                latitude = -90.0,
+                longitude = 0.0,
+                altitude = 0.0,
+                timestamp = ZonedDateTime.of(2024, 1, 1, 0, 0, 0, 0, ZoneId.of("UTC")),
+            )
         val decodedSouth = RicohProtocol.decodeLocation(RicohProtocol.encodeLocation(southPole))
         assertEquals(-90.0, decodedSouth.latitude, 0.0001)
 
         // International Date Line
-        val dateLine = GpsLocation(
-            latitude = 0.0,
-            longitude = 180.0,
-            altitude = 0.0,
-            timestamp = ZonedDateTime.of(2024, 1, 1, 0, 0, 0, 0, ZoneId.of("UTC")),
-        )
+        val dateLine =
+            GpsLocation(
+                latitude = 0.0,
+                longitude = 180.0,
+                altitude = 0.0,
+                timestamp = ZonedDateTime.of(2024, 1, 1, 0, 0, 0, 0, ZoneId.of("UTC")),
+            )
         val decodedDateLine = RicohProtocol.decodeLocation(RicohProtocol.encodeLocation(dateLine))
         assertEquals(180.0, decodedDateLine.longitude, 0.0001)
     }
@@ -143,12 +148,13 @@ class RicohProtocolTest {
     @Test
     fun `encodeLocation handles negative altitude`() {
         // Dead Sea - below sea level
-        val deadSea = GpsLocation(
-            latitude = 31.5,
-            longitude = 35.5,
-            altitude = -430.0,
-            timestamp = ZonedDateTime.of(2024, 1, 1, 0, 0, 0, 0, ZoneId.of("UTC")),
-        )
+        val deadSea =
+            GpsLocation(
+                latitude = 31.5,
+                longitude = 35.5,
+                altitude = -430.0,
+                timestamp = ZonedDateTime.of(2024, 1, 1, 0, 0, 0, 0, ZoneId.of("UTC")),
+            )
         val decoded = RicohProtocol.decodeLocation(RicohProtocol.encodeLocation(deadSea))
         assertEquals(-430.0, decoded.altitude, 0.0001)
     }
@@ -156,12 +162,13 @@ class RicohProtocolTest {
     @Test
     fun `encodeLocation handles high altitude`() {
         // Mount Everest
-        val everest = GpsLocation(
-            latitude = 27.9881,
-            longitude = 86.9250,
-            altitude = 8848.86,
-            timestamp = ZonedDateTime.of(2024, 1, 1, 0, 0, 0, 0, ZoneId.of("UTC")),
-        )
+        val everest =
+            GpsLocation(
+                latitude = 27.9881,
+                longitude = 86.9250,
+                altitude = 8848.86,
+                timestamp = ZonedDateTime.of(2024, 1, 1, 0, 0, 0, 0, ZoneId.of("UTC")),
+            )
         val decoded = RicohProtocol.decodeLocation(RicohProtocol.encodeLocation(everest))
         assertEquals(8848.86, decoded.altitude, 0.01)
     }
@@ -186,12 +193,13 @@ class RicohProtocolTest {
 
     @Test
     fun `formatLocationHex produces expected format`() {
-        val location = GpsLocation(
-            latitude = 37.7749,
-            longitude = -122.4194,
-            altitude = 10.0,
-            timestamp = ZonedDateTime.of(2024, 12, 25, 14, 30, 45, 0, ZoneId.of("UTC")),
-        )
+        val location =
+            GpsLocation(
+                latitude = 37.7749,
+                longitude = -122.4194,
+                altitude = 10.0,
+                timestamp = ZonedDateTime.of(2024, 12, 25, 14, 30, 45, 0, ZoneId.of("UTC")),
+            )
         val encoded = RicohProtocol.encodeLocation(location)
         val hex = RicohProtocol.formatLocationHex(encoded)
 
@@ -207,12 +215,13 @@ class RicohProtocolTest {
 
     @Test
     fun `DecodedLocation toString formats correctly`() {
-        val decoded = DecodedLocation(
-            latitude = 37.7749,
-            longitude = -122.4194,
-            altitude = 10.5,
-            dateTime = DecodedDateTime(2024, 12, 25, 14, 30, 45),
-        )
+        val decoded =
+            DecodedLocation(
+                latitude = 37.7749,
+                longitude = -122.4194,
+                altitude = 10.5,
+                dateTime = DecodedDateTime(2024, 12, 25, 14, 30, 45),
+            )
         val str = decoded.toString()
         assert(str.contains("37.7749"))
         assert(str.contains("-122.4194"))

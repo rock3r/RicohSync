@@ -1,12 +1,9 @@
 package dev.sebastiano.ricohsync.pairing
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -29,7 +26,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Bluetooth
 import androidx.compose.material.icons.rounded.CameraAlt
-import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Error
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Stop
@@ -61,9 +57,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import dev.sebastiano.ricohsync.domain.model.Camera
 
-/**
- * Screen for discovering and pairing new camera devices.
- */
+/** Screen for discovering and pairing new camera devices. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PairingScreen(
@@ -97,7 +91,7 @@ fun PairingScreen(
             FloatingActionButton(
                 onClick = {
                     if (isScanning) viewModel.stopScanning() else viewModel.startScanning()
-                },
+                }
             ) {
                 Icon(
                     if (isScanning) Icons.Rounded.Stop else Icons.Rounded.Refresh,
@@ -119,9 +113,7 @@ fun PairingScreen(
                     modifier = Modifier.padding(innerPadding),
                     discoveredDevices = currentState.discoveredDevices,
                     isScanning = currentState.isScanning,
-                    onDeviceClick = { camera ->
-                        viewModel.pairDevice(camera)
-                    },
+                    onDeviceClick = { camera -> viewModel.pairDevice(camera) },
                 )
             }
 
@@ -151,14 +143,8 @@ fun PairingScreen(
 }
 
 @Composable
-private fun IdleContent(
-    modifier: Modifier = Modifier,
-    onStartScanning: () -> Unit,
-) {
-    Box(
-        modifier = modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center,
-    ) {
+private fun IdleContent(modifier: Modifier = Modifier, onStartScanning: () -> Unit) {
+    Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier.padding(32.dp),
@@ -172,10 +158,7 @@ private fun IdleContent(
 
             Spacer(Modifier.height(16.dp))
 
-            Text(
-                "Ready to scan",
-                style = MaterialTheme.typography.titleLarge,
-            )
+            Text("Ready to scan", style = MaterialTheme.typography.titleLarge)
 
             Spacer(Modifier.height(8.dp))
 
@@ -200,19 +183,20 @@ private fun ScanningContent(
         // Scanning indicator
         if (isScanning) {
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f))
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                modifier =
+                    Modifier.fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f))
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 val infiniteTransition = rememberInfiniteTransition(label = "scan_animation")
-                val rotation by infiniteTransition.animateFloat(
-                    initialValue = 0f,
-                    targetValue = 360f,
-                    animationSpec = infiniteRepeatable(tween(2000)),
-                    label = "rotation",
-                )
+                val rotation by
+                    infiniteTransition.animateFloat(
+                        initialValue = 0f,
+                        targetValue = 360f,
+                        animationSpec = infiniteRepeatable(tween(2000)),
+                        label = "rotation",
+                    )
 
                 Icon(
                     Icons.Rounded.Bluetooth,
@@ -234,9 +218,7 @@ private fun ScanningContent(
         if (discoveredDevices.isEmpty()) {
             // No devices found yet
             Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth(),
+                modifier = Modifier.weight(1f).fillMaxWidth(),
                 contentAlignment = Alignment.Center,
             ) {
                 Column(
@@ -247,10 +229,7 @@ private fun ScanningContent(
 
                     Spacer(Modifier.height(16.dp))
 
-                    Text(
-                        "Looking for cameras...",
-                        style = MaterialTheme.typography.bodyLarge,
-                    )
+                    Text("Looking for cameras...", style = MaterialTheme.typography.bodyLarge)
 
                     Spacer(Modifier.height(8.dp))
 
@@ -269,10 +248,7 @@ private fun ScanningContent(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 items(discoveredDevices, key = { it.macAddress }) { camera ->
-                    DiscoveredDeviceCard(
-                        camera = camera,
-                        onClick = { onDeviceClick(camera) },
-                    )
+                    DiscoveredDeviceCard(camera = camera, onClick = { onDeviceClick(camera) })
                 }
             }
         }
@@ -280,28 +256,21 @@ private fun ScanningContent(
 }
 
 @Composable
-private fun DiscoveredDeviceCard(
-    camera: Camera,
-    onClick: () -> Unit,
-) {
+private fun DiscoveredDeviceCard(camera: Camera, onClick: () -> Unit) {
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
         shape = RoundedCornerShape(12.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primaryContainer),
+                modifier =
+                    Modifier.size(48.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.primaryContainer),
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
@@ -353,10 +322,7 @@ private fun PairingContent(
     onRetry: () -> Unit,
     onCancel: () -> Unit,
 ) {
-    Box(
-        modifier = modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center,
-    ) {
+    Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier.padding(32.dp),
@@ -381,11 +347,15 @@ private fun PairingContent(
                 Spacer(Modifier.height(8.dp))
 
                 Text(
-                    text = when (error) {
-                        PairingError.REJECTED -> "The camera rejected the pairing request. Make sure Bluetooth pairing is enabled on your camera."
-                        PairingError.TIMEOUT -> "Connection timed out. Make sure the camera is nearby and Bluetooth is enabled."
-                        PairingError.UNKNOWN -> "An unexpected error occurred. Please try again."
-                    },
+                    text =
+                        when (error) {
+                            PairingError.REJECTED ->
+                                "The camera rejected the pairing request. Make sure Bluetooth pairing is enabled on your camera."
+                            PairingError.TIMEOUT ->
+                                "Connection timed out. Make sure the camera is nearby and Bluetooth is enabled."
+                            PairingError.UNKNOWN ->
+                                "An unexpected error occurred. Please try again."
+                        },
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
@@ -394,28 +364,19 @@ private fun PairingContent(
                 Spacer(Modifier.height(24.dp))
 
                 Row {
-                    TextButton(onClick = onCancel) {
-                        Text("Cancel")
-                    }
+                    TextButton(onClick = onCancel) { Text("Cancel") }
 
                     Spacer(Modifier.width(16.dp))
 
-                    TextButton(onClick = onRetry) {
-                        Text("Retry")
-                    }
+                    TextButton(onClick = onRetry) { Text("Retry") }
                 }
             } else {
                 // Pairing in progress
-                CircularProgressIndicator(
-                    modifier = Modifier.size(64.dp),
-                )
+                CircularProgressIndicator(modifier = Modifier.size(64.dp))
 
                 Spacer(Modifier.height(16.dp))
 
-                Text(
-                    "Pairing with $deviceName...",
-                    style = MaterialTheme.typography.titleLarge,
-                )
+                Text("Pairing with $deviceName...", style = MaterialTheme.typography.titleLarge)
 
                 Spacer(Modifier.height(8.dp))
 
@@ -428,48 +389,34 @@ private fun PairingContent(
 
                 Spacer(Modifier.height(24.dp))
 
-                TextButton(onClick = onCancel) {
-                    Text("Cancel")
-                }
+                TextButton(onClick = onCancel) { Text("Cancel") }
             }
         }
     }
 }
 
 @Composable
-private fun PairingErrorDialog(
-    error: PairingError,
-    onDismiss: () -> Unit,
-    onRetry: () -> Unit,
-) {
+private fun PairingErrorDialog(error: PairingError, onDismiss: () -> Unit, onRetry: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Pairing failed") },
         text = {
             Text(
                 when (error) {
-                    PairingError.REJECTED -> "The camera rejected the pairing request. Please enable Bluetooth pairing on your camera and try again."
-                    PairingError.TIMEOUT -> "Connection timed out. Make sure the camera is nearby and has Bluetooth enabled."
+                    PairingError.REJECTED ->
+                        "The camera rejected the pairing request. Please enable Bluetooth pairing on your camera and try again."
+                    PairingError.TIMEOUT ->
+                        "Connection timed out. Make sure the camera is nearby and has Bluetooth enabled."
                     PairingError.UNKNOWN -> "An unexpected error occurred. Please try again."
                 }
             )
         },
-        confirmButton = {
-            TextButton(onClick = onRetry) {
-                Text("Retry")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel")
-            }
-        },
+        confirmButton = { TextButton(onClick = onRetry) { Text("Retry") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )
 }
 
-/**
- * Errors that can occur during pairing.
- */
+/** Errors that can occur during pairing. */
 enum class PairingError {
     /** Camera rejected the pairing request. */
     REJECTED,
@@ -480,4 +427,3 @@ enum class PairingError {
     /** Unknown error. */
     UNKNOWN,
 }
-

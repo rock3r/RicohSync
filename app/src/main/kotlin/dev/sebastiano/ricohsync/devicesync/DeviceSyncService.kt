@@ -17,10 +17,13 @@ import androidx.core.content.PermissionChecker
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
+import dev.sebastiano.ricohsync.data.repository.DataStorePairedDevicesRepository
 import dev.sebastiano.ricohsync.data.repository.FusedLocationRepository
 import dev.sebastiano.ricohsync.data.repository.KableCameraRepository
+import dev.sebastiano.ricohsync.data.repository.pairedDevicesDataStoreV2
 import dev.sebastiano.ricohsync.domain.model.RicohCamera
 import dev.sebastiano.ricohsync.domain.model.SyncState
+import dev.sebastiano.ricohsync.domain.repository.PairedDevicesRepository
 import kotlin.coroutines.CoroutineContext
 import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.CoroutineScope
@@ -53,6 +56,10 @@ internal class DeviceSyncService : Service(), CoroutineScope {
 
     private val vibrator by lazy { SyncErrorVibrator(applicationContext) }
 
+    private val pairedDevicesRepository: PairedDevicesRepository by lazy {
+        DataStorePairedDevicesRepository(applicationContext.pairedDevicesDataStoreV2)
+    }
+
     private val syncCoordinator by lazy {
         SyncCoordinator(
             cameraRepository =
@@ -60,6 +67,7 @@ internal class DeviceSyncService : Service(), CoroutineScope {
                     vendorRegistry = dev.sebastiano.ricohsync.RicohSyncApp.createVendorRegistry()
                 ),
             locationRepository = FusedLocationRepository(applicationContext),
+            pairedDevicesRepository = pairedDevicesRepository,
             coroutineScope = this,
         )
     }

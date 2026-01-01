@@ -28,15 +28,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import dev.sebastiano.ricohsync.domain.model.Camera
 
-/**
- * Screen for discovering and selecting cameras.
- */
+/** Screen for discovering and selecting cameras. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun ScanningScreen(
-    viewModel: ScanningViewModel,
-    onDeviceSelected: (Camera) -> Unit,
-) {
+internal fun ScanningScreen(viewModel: ScanningViewModel, onDeviceSelected: (Camera) -> Unit) {
     val state by viewModel.state
     val currentState = state
     val isScanning = currentState is PairingState.Scanning
@@ -48,7 +43,7 @@ internal fun ScanningScreen(
         },
         floatingActionButton = {
             FloatingActionButton(
-                onClick = { if (isScanning) viewModel.stopScan() else viewModel.doScan() },
+                onClick = { if (isScanning) viewModel.stopScan() else viewModel.doScan() }
             ) {
                 Icon(
                     if (isScanning) Icons.Rounded.Stop else Icons.Rounded.Refresh,
@@ -64,10 +59,10 @@ internal fun ScanningScreen(
                 items(foundDevices, key = { it.identifier }) { camera ->
                     DiscoveredDevice(
                         camera = camera,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(48.dp)
-                            .clickable { onDeviceSelected(camera) },
+                        modifier =
+                            Modifier.fillMaxWidth().heightIn(48.dp).clickable {
+                                onDeviceSelected(camera)
+                            },
                     )
                 }
             }

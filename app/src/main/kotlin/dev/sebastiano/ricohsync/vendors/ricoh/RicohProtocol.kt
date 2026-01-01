@@ -123,12 +123,13 @@ object RicohProtocol : CameraProtocol {
         val second = buffer.get().toInt()
 
         val dateTime = DecodedDateTime(year, month, day, hour, minute, second)
-        val decoded = DecodedLocation(
-            latitude = latitude,
-            longitude = longitude,
-            altitude = altitude,
-            dateTime = dateTime,
-        )
+        val decoded =
+            DecodedLocation(
+                latitude = latitude,
+                longitude = longitude,
+                altitude = altitude,
+                dateTime = dateTime,
+            )
         return decoded.toString()
     }
 
@@ -141,9 +142,7 @@ object RicohProtocol : CameraProtocol {
         return ByteArray(1) { if (enabled) 1 else 0 }
     }
 
-    /**
-     * Decodes the geo-tagging enabled/disabled state from Ricoh format.
-     */
+    /** Decodes the geo-tagging enabled/disabled state from Ricoh format. */
     override fun decodeGeoTaggingEnabled(bytes: ByteArray): Boolean {
         require(bytes.isNotEmpty()) { "Geo-tagging data must be at least 1 byte" }
         return bytes.first() == 1.toByte()

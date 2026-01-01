@@ -8,8 +8,8 @@ import kotlinx.coroutines.flow.Flow
 /**
  * Repository interface for camera BLE operations.
  *
- * Abstracts the BLE communication layer to allow for easier testing.
- * Supports cameras from multiple vendors (Ricoh, Canon, Nikon, etc.).
+ * Abstracts the BLE communication layer to allow for easier testing. Supports cameras from multiple
+ * vendors (Ricoh, Canon, Nikon, etc.).
  */
 interface CameraRepository {
 
@@ -40,8 +40,8 @@ interface CameraRepository {
 /**
  * Represents an active connection to a camera.
  *
- * This interface provides methods to interact with a connected camera.
- * The actual capabilities available depend on the camera vendor.
+ * This interface provides methods to interact with a connected camera. The actual capabilities
+ * available depend on the camera vendor.
  */
 interface CameraConnection {
 

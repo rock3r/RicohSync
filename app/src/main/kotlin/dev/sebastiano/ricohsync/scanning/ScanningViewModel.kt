@@ -16,6 +16,7 @@ import com.juul.kable.logs.SystemLogEngine
 import dev.sebastiano.ricohsync.RicohSyncApp
 import dev.sebastiano.ricohsync.domain.model.Camera
 import dev.sebastiano.ricohsync.domain.vendor.CameraVendorRegistry
+import kotlin.uuid.ExperimentalUuidApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
@@ -24,15 +25,14 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.onStart
-import kotlin.uuid.ExperimentalUuidApi
 
 private const val TAG = "ScanningViewModel"
 
 /**
  * ViewModel for the camera scanning screen.
  *
- * Manages BLE scanning for supported cameras and exposes discovered devices to the UI.
- * Supports multiple camera vendors through the camera vendor registry.
+ * Manages BLE scanning for supported cameras and exposes discovered devices to the UI. Supports
+ * multiple camera vendors through the camera vendor registry.
  */
 @OptIn(ExperimentalUuidApi::class)
 internal class ScanningViewModel : ViewModel() {
@@ -52,9 +52,8 @@ internal class ScanningViewModel : ViewModel() {
             level = Logging.Level.Events
             format = Logging.Format.Multiline
         }
-        scanSettings = ScanSettings.Builder()
-            .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
-            .build()
+        scanSettings =
+            ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY).build()
     }
 
     init {
@@ -66,17 +65,18 @@ internal class ScanningViewModel : ViewModel() {
         if (scanJob != null) return
         _state.value = PairingState.Scanning(mutableStateMapOf())
 
-        scanJob = scanner.advertisements
-            .onEach { advertisement ->
-                if (_state.value !is PairingState.Scanning) {
-                    _state.value = PairingState.Scanning(mutableStateMapOf())
+        scanJob =
+            scanner.advertisements
+                .onEach { advertisement ->
+                    if (_state.value !is PairingState.Scanning) {
+                        _state.value = PairingState.Scanning(mutableStateMapOf())
+                    }
+                    onDiscovery(advertisement)
                 }
-                onDiscovery(advertisement)
-            }
-            .onStart { Log.i(TAG, "BLE scan started") }
-            .onCompletion { Log.i(TAG, "BLE scan completed") }
-            .flowOn(Dispatchers.IO)
-            .launchIn(viewModelScope)
+                .onStart { Log.i(TAG, "BLE scan started") }
+                .onCompletion { Log.i(TAG, "BLE scan completed") }
+                .flowOn(Dispatchers.IO)
+                .launchIn(viewModelScope)
     }
 
     private fun onDiscovery(advertisement: PlatformAdvertisement) {
@@ -94,11 +94,12 @@ internal class ScanningViewModel : ViewModel() {
         scanJob = null
 
         val previousState = _state.value
-        val discoveredDevices = if (previousState is PairingState.Scanning) {
-            previousState.found
-        } else {
-            mutableStateMapOf()
-        }
+        val discoveredDevices =
+            if (previousState is PairingState.Scanning) {
+                previousState.found
+            } else {
+                mutableStateMapOf()
+            }
 
         _state.value = PairingState.Done(discoveredDevices)
     }
@@ -109,10 +110,8 @@ internal class ScanningViewModel : ViewModel() {
      * @return A Camera instance if a vendor is recognized, or null if no vendor matches.
      */
     private fun PlatformAdvertisement.toCamera(): Camera? {
-        val vendor = vendorRegistry.identifyVendor(
-            deviceName = peripheralName ?: name,
-            serviceUuids = uuids,
-        )
+        val vendor =
+            vendorRegistry.identifyVendor(deviceName = peripheralName ?: name, serviceUuids = uuids)
 
         if (vendor == null) {
             Log.w(TAG, "No vendor recognized for device: ${peripheralName ?: name}")

@@ -1,4 +1,5 @@
 @file:Suppress("DEPRECATION")
+
 package dev.sebastiano.ricohsync.data.encoding
 
 import dev.sebastiano.ricohsync.domain.model.GpsLocation
@@ -7,15 +8,16 @@ import java.time.ZonedDateTime
 /**
  * Backward compatibility wrapper for the Ricoh protocol.
  *
- * @deprecated This class has been moved to vendors.ricoh package.
- *   Use dev.sebastiano.ricohsync.vendors.ricoh.RicohProtocol instead.
+ * @deprecated This class has been moved to vendors.ricoh package. Use
+ *   dev.sebastiano.ricohsync.vendors.ricoh.RicohProtocol instead.
  */
 @Deprecated(
     message = "Moved to vendors.ricoh package",
-    replaceWith = ReplaceWith(
-        "dev.sebastiano.ricohsync.vendors.ricoh.RicohProtocol",
-        "dev.sebastiano.ricohsync.vendors.ricoh.RicohProtocol"
-    ),
+    replaceWith =
+        ReplaceWith(
+            "dev.sebastiano.ricohsync.vendors.ricoh.RicohProtocol",
+            "dev.sebastiano.ricohsync.vendors.ricoh.RicohProtocol",
+        ),
     level = DeprecationLevel.WARNING,
 )
 object RicohProtocol {
@@ -32,7 +34,8 @@ object RicohProtocol {
 
     /** @see dev.sebastiano.ricohsync.vendors.ricoh.RicohProtocol.decodeDateTime */
     fun decodeDateTime(bytes: ByteArray): DecodedDateTime {
-        val decodedString = dev.sebastiano.ricohsync.vendors.ricoh.RicohProtocol.decodeDateTime(bytes)
+        val decodedString =
+            dev.sebastiano.ricohsync.vendors.ricoh.RicohProtocol.decodeDateTime(bytes)
         // Parse the string back to DecodedDateTime for backward compatibility
         // Format is "YYYY-MM-DD HH:mm:ss"
         val parts = decodedString.split(" ", "-", ":")
@@ -52,12 +55,13 @@ object RicohProtocol {
 
     /** @see dev.sebastiano.ricohsync.vendors.ricoh.RicohProtocol.decodeLocation */
     fun decodeLocation(bytes: ByteArray): DecodedLocation {
-        val decodedString = dev.sebastiano.ricohsync.vendors.ricoh.RicohProtocol.decodeLocation(bytes)
+        val decodedString =
+            dev.sebastiano.ricohsync.vendors.ricoh.RicohProtocol.decodeLocation(bytes)
         // Parse the string for backward compatibility
         // Format is "(latitude, longitude), altitude: altitude. Time: YYYY-MM-DD HH:mm:ss"
-        val match = Regex("""\(([-\d.]+), ([-\d.]+)\), altitude: ([-\d.]+)\. Time: (.+)""")
-            .find(decodedString)
-            ?: error("Failed to parse location string: $decodedString")
+        val match =
+            Regex("""\(([-\d.]+), ([-\d.]+)\), altitude: ([-\d.]+)\. Time: (.+)""")
+                .find(decodedString) ?: error("Failed to parse location string: $decodedString")
 
         val (lat, lon, alt, timeStr) = match.destructured
         val timeParts = timeStr.split(" ", "-", ":")
@@ -66,14 +70,15 @@ object RicohProtocol {
             latitude = lat.toDouble(),
             longitude = lon.toDouble(),
             altitude = alt.toDouble(),
-            dateTime = DecodedDateTime(
-                year = timeParts[0].toInt(),
-                month = timeParts[1].toInt(),
-                day = timeParts[2].toInt(),
-                hour = timeParts[3].toInt(),
-                minute = timeParts[4].toInt(),
-                second = timeParts[5].toInt(),
-            ),
+            dateTime =
+                DecodedDateTime(
+                    year = timeParts[0].toInt(),
+                    month = timeParts[1].toInt(),
+                    day = timeParts[2].toInt(),
+                    hour = timeParts[3].toInt(),
+                    minute = timeParts[4].toInt(),
+                    second = timeParts[5].toInt(),
+                ),
         )
     }
 

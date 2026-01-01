@@ -91,9 +91,7 @@ private fun Connecting(state: DeviceSyncState.Connecting) {
 
         Spacer(Modifier.height(8.dp))
 
-        val name = remember(state.camera) {
-            state.camera.name ?: state.camera.identifier
-        }
+        val name = remember(state.camera) { state.camera.name ?: state.camera.identifier }
 
         Text("Connecting to $name...")
     }
@@ -103,14 +101,16 @@ private fun Connecting(state: DeviceSyncState.Connecting) {
 private fun Syncing(state: DeviceSyncState.Syncing) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         val rotateAnimation = rememberInfiniteTransition("sync_rotation")
-        val rotation by rotateAnimation.animateFloat(
-            0f,
-            -1 * 360f,
-            animationSpec = InfiniteRepeatableSpec(
-                tween(durationMillis = 1000, delayMillis = 800, easing = EaseInOut),
-                repeatMode = RepeatMode.Restart,
-            ),
-        )
+        val rotation by
+            rotateAnimation.animateFloat(
+                0f,
+                -1 * 360f,
+                animationSpec =
+                    InfiniteRepeatableSpec(
+                        tween(durationMillis = 1000, delayMillis = 800, easing = EaseInOut),
+                        repeatMode = RepeatMode.Restart,
+                    ),
+            )
         Icon(
             Icons.Rounded.Sync,
             contentDescription = null,
@@ -146,16 +146,17 @@ private fun Syncing(state: DeviceSyncState.Syncing) {
 
         Spacer(Modifier.height(8.dp))
 
-        val location = remember(state.syncInfo) {
-            val gpsLocation = state.syncInfo?.location
-            if (gpsLocation != null) {
-                buildString {
-                    append(gpsLocation.latitude.toString(decimals = 6))
-                    append(", ")
-                    append(gpsLocation.longitude.toString(decimals = 6))
-                }
-            } else null
-        }
+        val location =
+            remember(state.syncInfo) {
+                val gpsLocation = state.syncInfo?.location
+                if (gpsLocation != null) {
+                    buildString {
+                        append(gpsLocation.latitude.toString(decimals = 6))
+                        append(", ")
+                        append(gpsLocation.longitude.toString(decimals = 6))
+                    }
+                } else null
+            }
 
         if (location != null) {
             Text("Last location: $location", style = MaterialTheme.typography.labelSmall)

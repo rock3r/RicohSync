@@ -119,24 +119,26 @@ class SonyProtocolTest {
 
     @Test
     fun `encodeLocation produces 95 bytes`() {
-        val location = GpsLocation(
-            latitude = 37.7749,
-            longitude = -122.4194,
-            altitude = 10.0,
-            timestamp = ZonedDateTime.of(2024, 12, 25, 14, 30, 45, 0, ZoneOffset.UTC),
-        )
+        val location =
+            GpsLocation(
+                latitude = 37.7749,
+                longitude = -122.4194,
+                altitude = 10.0,
+                timestamp = ZonedDateTime.of(2024, 12, 25, 14, 30, 45, 0, ZoneOffset.UTC),
+            )
         val encoded = SonyProtocol.encodeLocation(location)
         assertEquals(95, encoded.size)
     }
 
     @Test
     fun `encodeLocation sets correct coordinates`() {
-        val location = GpsLocation(
-            latitude = 37.7749,
-            longitude = -122.4194,
-            altitude = 10.0,
-            timestamp = ZonedDateTime.of(2024, 12, 25, 14, 30, 45, 0, ZoneOffset.UTC),
-        )
+        val location =
+            GpsLocation(
+                latitude = 37.7749,
+                longitude = -122.4194,
+                altitude = 10.0,
+                timestamp = ZonedDateTime.of(2024, 12, 25, 14, 30, 45, 0, ZoneOffset.UTC),
+            )
         val encoded = SonyProtocol.encodeLocation(location)
 
         val buffer = ByteBuffer.wrap(encoded).order(ByteOrder.BIG_ENDIAN)
@@ -152,12 +154,13 @@ class SonyProtocolTest {
 
     @Test
     fun `encodeLocation handles negative coordinates`() {
-        val location = GpsLocation(
-            latitude = -33.8688,
-            longitude = 151.2093,
-            altitude = 0.0,
-            timestamp = ZonedDateTime.of(2024, 12, 25, 14, 30, 45, 0, ZoneOffset.UTC),
-        )
+        val location =
+            GpsLocation(
+                latitude = -33.8688,
+                longitude = 151.2093,
+                altitude = 0.0,
+                timestamp = ZonedDateTime.of(2024, 12, 25, 14, 30, 45, 0, ZoneOffset.UTC),
+            )
         val encoded = SonyProtocol.encodeLocation(location)
 
         val buffer = ByteBuffer.wrap(encoded).order(ByteOrder.BIG_ENDIAN)
@@ -172,12 +175,13 @@ class SonyProtocolTest {
 
     @Test
     fun `decodeLocation correctly decodes encoded location`() {
-        val location = GpsLocation(
-            latitude = 37.7749,
-            longitude = -122.4194,
-            altitude = 0.0,
-            timestamp = ZonedDateTime.of(2024, 12, 25, 14, 30, 45, 0, ZoneOffset.UTC),
-        )
+        val location =
+            GpsLocation(
+                latitude = 37.7749,
+                longitude = -122.4194,
+                altitude = 0.0,
+                timestamp = ZonedDateTime.of(2024, 12, 25, 14, 30, 45, 0, ZoneOffset.UTC),
+            )
         val encoded = SonyProtocol.encodeLocation(location)
         val decoded = SonyProtocol.decodeLocation(encoded)
 
@@ -210,23 +214,25 @@ class SonyProtocolTest {
 
     @Test
     fun `encodeLocationPacket without timezone produces 91 bytes`() {
-        val packet = SonyProtocol.encodeLocationPacket(
-            latitude = 0.0,
-            longitude = 0.0,
-            dateTime = ZonedDateTime.now(ZoneOffset.UTC),
-            includeTimezone = false,
-        )
+        val packet =
+            SonyProtocol.encodeLocationPacket(
+                latitude = 0.0,
+                longitude = 0.0,
+                dateTime = ZonedDateTime.now(ZoneOffset.UTC),
+                includeTimezone = false,
+            )
         assertEquals(91, packet.size)
     }
 
     @Test
     fun `encodeLocationPacket without timezone sets correct flag`() {
-        val packet = SonyProtocol.encodeLocationPacket(
-            latitude = 0.0,
-            longitude = 0.0,
-            dateTime = ZonedDateTime.now(ZoneOffset.UTC),
-            includeTimezone = false,
-        )
+        val packet =
+            SonyProtocol.encodeLocationPacket(
+                latitude = 0.0,
+                longitude = 0.0,
+                dateTime = ZonedDateTime.now(ZoneOffset.UTC),
+                includeTimezone = false,
+            )
         // Byte 5: Timezone flag (0x00 = omit)
         assertEquals(0x00.toByte(), packet[5])
     }

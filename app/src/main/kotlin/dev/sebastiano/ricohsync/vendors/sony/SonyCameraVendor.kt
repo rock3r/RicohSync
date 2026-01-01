@@ -25,9 +25,7 @@ object SonyCameraVendor : CameraVendor {
 
     override fun recognizesDevice(deviceName: String?, serviceUuids: List<Uuid>): Boolean {
         // Sony cameras using DI Remote Control advertise a specific service UUID
-        return serviceUuids.any { uuid ->
-            SonyGattSpec.scanFilterServiceUuids.contains(uuid)
-        }
+        return serviceUuids.any { uuid -> SonyGattSpec.scanFilterServiceUuids.contains(uuid) }
     }
 
     override fun getCapabilities(): CameraCapabilities {

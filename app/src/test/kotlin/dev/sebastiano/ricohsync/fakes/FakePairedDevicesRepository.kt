@@ -8,9 +8,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 
-/**
- * Fake implementation of [PairedDevicesRepository] for testing.
- */
+/** Fake implementation of [PairedDevicesRepository] for testing. */
 class FakePairedDevicesRepository : PairedDevicesRepository {
 
     private val _devices = MutableStateFlow<List<PairedDevice>>(emptyList())
@@ -23,12 +21,16 @@ class FakePairedDevicesRepository : PairedDevicesRepository {
     // Tracking for test verification
     var addDeviceCalled = false
         private set
+
     var removeDeviceCalled = false
         private set
+
     var setDeviceEnabledCalled = false
         private set
+
     var lastAddedCamera: Camera? = null
         private set
+
     var lastRemovedMacAddress: String? = null
         private set
 
@@ -36,12 +38,13 @@ class FakePairedDevicesRepository : PairedDevicesRepository {
         addDeviceCalled = true
         lastAddedCamera = camera
 
-        val newDevice = PairedDevice(
-            macAddress = camera.macAddress,
-            name = camera.name,
-            vendorId = camera.vendor.vendorId,
-            isEnabled = enabled,
-        )
+        val newDevice =
+            PairedDevice(
+                macAddress = camera.macAddress,
+                name = camera.name,
+                vendorId = camera.vendor.vendorId,
+                isEnabled = enabled,
+            )
 
         _devices.update { devices ->
             val existingIndex = devices.indexOfFirst { it.macAddress == camera.macAddress }
@@ -57,9 +60,7 @@ class FakePairedDevicesRepository : PairedDevicesRepository {
         removeDeviceCalled = true
         lastRemovedMacAddress = macAddress
 
-        _devices.update { devices ->
-            devices.filter { it.macAddress != macAddress }
-        }
+        _devices.update { devices -> devices.filter { it.macAddress != macAddress } }
     }
 
     override suspend fun setDeviceEnabled(macAddress: String, enabled: Boolean) {
@@ -88,6 +89,18 @@ class FakePairedDevicesRepository : PairedDevicesRepository {
         }
     }
 
+    override suspend fun updateLastSyncedAt(macAddress: String, timestamp: Long) {
+        _devices.update { devices ->
+            devices.map { device ->
+                if (device.macAddress == macAddress) {
+                    device.copy(lastSyncedAt = timestamp)
+                } else {
+                    device
+                }
+            }
+        }
+    }
+
     override suspend fun isDevicePaired(macAddress: String): Boolean {
         return _devices.value.any { it.macAddress == macAddress }
     }
@@ -106,30 +119,22 @@ class FakePairedDevicesRepository : PairedDevicesRepository {
 
     // Test helpers
 
-    /**
-     * Adds a device directly for test setup.
-     */
+    /** Adds a device directly for test setup. */
     fun addTestDevice(device: PairedDevice) {
         _devices.update { it + device }
     }
 
-    /**
-     * Sets devices directly for test setup.
-     */
+    /** Sets devices directly for test setup. */
     fun setTestDevices(devices: List<PairedDevice>) {
         _devices.value = devices
     }
 
-    /**
-     * Clears all devices.
-     */
+    /** Clears all devices. */
     fun clear() {
         _devices.value = emptyList()
     }
 
-    /**
-     * Resets all tracking flags.
-     */
+    /** Resets all tracking flags. */
     fun resetTracking() {
         addDeviceCalled = false
         removeDeviceCalled = false
@@ -138,4 +143,3 @@ class FakePairedDevicesRepository : PairedDevicesRepository {
         lastRemovedMacAddress = null
     }
 }
-

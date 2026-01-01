@@ -3,12 +3,7 @@ package dev.sebastiano.ricohsync
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
 import dev.sebastiano.ricohsync.domain.repository.PairedDevicesRepository
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.flowOn
-import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.onEach
 
 /**
  * Main ViewModel that manages the app's navigation state.
@@ -18,9 +13,7 @@ import kotlinx.coroutines.flow.onEach
  * - Devices list screen (main screen with paired devices)
  * - Pairing screen (for adding new devices)
  */
-class MainViewModel(
-    private val pairedDevicesRepository: PairedDevicesRepository,
-) : ViewModel() {
+class MainViewModel(private val pairedDevicesRepository: PairedDevicesRepository) : ViewModel() {
 
     private val _mainState = mutableStateOf<MainState>(MainState.NeedsPermissions)
     val mainState: MutableState<MainState> = _mainState
@@ -43,9 +36,7 @@ class MainViewModel(
     }
 }
 
-/**
- * Main navigation state of the app.
- */
+/** Main navigation state of the app. */
 sealed interface MainState {
     /** Permissions need to be requested. */
     data object NeedsPermissions : MainState

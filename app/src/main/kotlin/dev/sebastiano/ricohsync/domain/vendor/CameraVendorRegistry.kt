@@ -6,8 +6,8 @@ import kotlin.uuid.Uuid
 /**
  * Registry for managing available camera vendors.
  *
- * This registry maintains a list of supported camera vendors and provides
- * methods to identify which vendor a discovered BLE device belongs to.
+ * This registry maintains a list of supported camera vendors and provides methods to identify which
+ * vendor a discovered BLE device belongs to.
  */
 @OptIn(ExperimentalUuidApi::class)
 interface CameraVendorRegistry {
@@ -50,20 +50,16 @@ interface CameraVendorRegistry {
 /**
  * Default implementation of CameraVendorRegistry.
  *
- * This implementation uses a simple list to store registered vendors.
- * Vendors are checked in registration order when identifying devices.
+ * This implementation uses a simple list to store registered vendors. Vendors are checked in
+ * registration order when identifying devices.
  */
 @OptIn(ExperimentalUuidApi::class)
-class DefaultCameraVendorRegistry(
-    private val vendors: List<CameraVendor>,
-) : CameraVendorRegistry {
+class DefaultCameraVendorRegistry(private val vendors: List<CameraVendor>) : CameraVendorRegistry {
 
     override fun getAllVendors(): List<CameraVendor> = vendors
 
     override fun identifyVendor(deviceName: String?, serviceUuids: List<Uuid>): CameraVendor? {
-        return vendors.firstOrNull { vendor ->
-            vendor.recognizesDevice(deviceName, serviceUuids)
-        }
+        return vendors.firstOrNull { vendor -> vendor.recognizesDevice(deviceName, serviceUuids) }
     }
 
     override fun getVendorById(vendorId: String): CameraVendor? {

@@ -8,8 +8,8 @@ import kotlin.uuid.Uuid
 /**
  * Represents a camera vendor (manufacturer/model family).
  *
- * This interface defines the vendor-specific BLE protocol details that enable
- * RicohSync to communicate with cameras from different manufacturers.
+ * This interface defines the vendor-specific BLE protocol details that enable RicohSync to
+ * communicate with cameras from different manufacturers.
  *
  * Each vendor implementation encapsulates:
  * - BLE GATT service and characteristic UUIDs
@@ -44,15 +44,13 @@ interface CameraVendor {
     /**
      * Returns the device capabilities for this vendor.
      *
-     * Different vendors may support different features (e.g., geo-tagging,
-     * time sync, firmware version reading, etc.).
+     * Different vendors may support different features (e.g., geo-tagging, time sync, firmware
+     * version reading, etc.).
      */
     fun getCapabilities(): CameraCapabilities
 }
 
-/**
- * Defines the BLE GATT service and characteristic UUIDs for a camera vendor.
- */
+/** Defines the BLE GATT service and characteristic UUIDs for a camera vendor. */
 @OptIn(ExperimentalUuidApi::class)
 interface CameraGattSpec {
 
@@ -60,7 +58,8 @@ interface CameraGattSpec {
     val scanFilterServiceUuids: List<Uuid>
 
     /** Device name prefix(es) used for scanning and filtering camera advertisements. */
-    val scanFilterDeviceNames: List<String> get() = emptyList()
+    val scanFilterDeviceNames: List<String>
+        get() = emptyList()
 
     /** Firmware version service UUID, or null if not supported. */
     val firmwareServiceUuid: Uuid?
@@ -90,9 +89,7 @@ interface CameraGattSpec {
     val locationCharacteristicUuid: Uuid?
 }
 
-/**
- * Handles encoding and decoding of data for a camera vendor's BLE protocol.
- */
+/** Handles encoding and decoding of data for a camera vendor's BLE protocol. */
 interface CameraProtocol {
 
     /**
@@ -138,9 +135,7 @@ interface CameraProtocol {
     fun decodeGeoTaggingEnabled(bytes: ByteArray): Boolean
 }
 
-/**
- * Defines the capabilities supported by a camera vendor.
- */
+/** Defines the capabilities supported by a camera vendor. */
 data class CameraCapabilities(
     /** Whether the camera supports reading firmware version. */
     val supportsFirmwareVersion: Boolean = false,

@@ -57,8 +57,8 @@ object SonyProtocol : CameraProtocol {
     /**
      * Encodes date/time for Sony cameras.
      *
-     * Note: Sony combines location and time in the same packet. This method
-     * sends a packet with zero coordinates but valid time data.
+     * Note: Sony combines location and time in the same packet. This method sends a packet with
+     * zero coordinates but valid time data.
      */
     override fun encodeDateTime(dateTime: ZonedDateTime): ByteArray {
         return encodeLocationPacket(
@@ -119,9 +119,8 @@ object SonyProtocol : CameraProtocol {
         val minute = buffer.get().toInt()
         val second = buffer.get().toInt()
 
-        val dateTimeStr = "%04d-%02d-%02d %02d:%02d:%02d UTC".format(
-            year, month, day, hour, minute, second
-        )
+        val dateTimeStr =
+            "%04d-%02d-%02d %02d:%02d:%02d UTC".format(year, month, day, hour, minute, second)
 
         return "Lat: $latitude, Lon: $longitude, Time: $dateTimeStr"
     }

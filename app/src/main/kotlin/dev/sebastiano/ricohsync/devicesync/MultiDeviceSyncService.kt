@@ -83,6 +83,7 @@ class MultiDeviceSyncService : Service(), CoroutineScope {
             cameraRepository = cameraRepository,
             locationCollector = locationCollector,
             vendorRegistry = vendorRegistry,
+            pairedDevicesRepository = pairedDevicesRepository,
             coroutineScope = this,
         )
     }

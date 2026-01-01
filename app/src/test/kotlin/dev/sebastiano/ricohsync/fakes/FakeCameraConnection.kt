@@ -7,9 +7,7 @@ import java.time.ZonedDateTime
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 
-class FakeCameraConnection(
-    override val camera: Camera,
-) : CameraConnection {
+class FakeCameraConnection(override val camera: Camera) : CameraConnection {
 
     private val _isConnected = MutableStateFlow(true)
     override val isConnected: Flow<Boolean> = _isConnected
@@ -17,16 +15,22 @@ class FakeCameraConnection(
     var firmwareVersion = "1.0.0"
     var pairedDeviceName: String? = null
         private set
+
     var syncedDateTime: ZonedDateTime? = null
         private set
+
     var geoTaggingEnabled = false
         private set
+
     var lastSyncedLocation: GpsLocation? = null
         private set
+
     var disconnectCalled = false
         private set
+
     var readDateTimeCalled = false
         private set
+
     var readFirmwareVersionCalled = false
         private set
 

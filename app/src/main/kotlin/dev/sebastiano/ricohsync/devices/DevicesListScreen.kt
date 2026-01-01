@@ -120,7 +120,9 @@ fun DevicesListScreen(viewModel: DevicesListViewModel, onAddDeviceClick: () -> U
                             viewModel.setDeviceEnabled(device.device.macAddress, enabled)
                         },
                         onUnpairClick = { device -> deviceToUnpair = device },
-                        onRetryClick = { device -> viewModel.retryConnection(device.device.macAddress) },
+                        onRetryClick = { device ->
+                            viewModel.retryConnection(device.device.macAddress)
+                        },
                     )
                 }
             }
@@ -248,7 +250,21 @@ private fun DeviceCard(
 
                     Spacer(Modifier.height(2.dp))
 
-                    ConnectionStatusText(connectionState)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        ConnectionStatusText(connectionState)
+
+                        if (device.lastSyncedAt != null) {
+                            Text(
+                                text =
+                                    " • Last synced ${formatElapsedTimeSince(device.lastSyncedAt)}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color =
+                                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
                 }
 
                 Spacer(Modifier.width(8.dp))
@@ -278,12 +294,15 @@ private fun DeviceCard(
                     DeviceDetailRow("MAC Address", device.macAddress)
                     DeviceDetailRow("Vendor", device.vendorId.replaceFirstChar { it.uppercase() })
 
+                    if (device.lastSyncedAt != null) {
+                        DeviceDetailRow("Last sync", formatElapsedTimeSince(device.lastSyncedAt))
+                    }
+
                     if (connectionState is DeviceConnectionState.Syncing) {
                         connectionState.firmwareVersion?.let { version ->
                             DeviceDetailRow("Firmware", version)
                         }
                         connectionState.lastSyncInfo?.let { syncInfo ->
-                            DeviceDetailRow("Last sync", formatElapsedTimeSince(syncInfo.syncTime))
                             DeviceDetailRow(
                                 "Location",
                                 "${syncInfo.location.latitude.format(4)}, ${syncInfo.location.longitude.format(4)}",

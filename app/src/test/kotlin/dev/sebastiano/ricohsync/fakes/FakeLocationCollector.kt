@@ -6,9 +6,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
-/**
- * Fake implementation of [LocationCollectionCoordinator] for testing.
- */
+/** Fake implementation of [LocationCollectionCoordinator] for testing. */
 class FakeLocationCollector : LocationCollectionCoordinator {
 
     private val _locationUpdates = MutableStateFlow<GpsLocation?>(null)
@@ -22,10 +20,13 @@ class FakeLocationCollector : LocationCollectionCoordinator {
     // Tracking for test verification
     var startCollectingCalled = false
         private set
+
     var stopCollectingCalled = false
         private set
+
     var registerDeviceCalls = mutableListOf<String>()
         private set
+
     var unregisterDeviceCalls = mutableListOf<String>()
         private set
 
@@ -59,21 +60,15 @@ class FakeLocationCollector : LocationCollectionCoordinator {
 
     // Test helpers
 
-    /**
-     * Emits a location update for testing.
-     */
+    /** Emits a location update for testing. */
     fun emitLocation(location: GpsLocation?) {
         _locationUpdates.value = location
     }
 
-    /**
-     * Gets the current set of registered devices.
-     */
+    /** Gets the current set of registered devices. */
     fun getRegisteredDevices(): Set<String> = registeredDevices.toSet()
 
-    /**
-     * Resets all tracking and state.
-     */
+    /** Resets all tracking and state. */
     fun reset() {
         startCollectingCalled = false
         stopCollectingCalled = false
@@ -84,4 +79,3 @@ class FakeLocationCollector : LocationCollectionCoordinator {
         _locationUpdates.value = null
     }
 }
-

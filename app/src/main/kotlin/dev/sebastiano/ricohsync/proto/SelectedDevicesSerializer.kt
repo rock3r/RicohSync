@@ -20,13 +20,8 @@ internal object SelectedDevicesSerializer : Serializer<SelectedDevices> {
         }
     }
 
-    override suspend fun writeTo(
-        t: SelectedDevices,
-        output: OutputStream
-    ) = t.writeTo(output)
+    override suspend fun writeTo(t: SelectedDevices, output: OutputStream) = t.writeTo(output)
 }
 
-val Context.pairedDevicesDataStore: DataStore<SelectedDevices> by dataStore(
-    fileName = "selected-devices.pb",
-    serializer = SelectedDevicesSerializer
-)
+val Context.pairedDevicesDataStore: DataStore<SelectedDevices> by
+    dataStore(fileName = "selected-devices.pb", serializer = SelectedDevicesSerializer)

@@ -5,9 +5,7 @@ import dev.sebastiano.ricohsync.domain.vendor.DefaultCameraVendorRegistry
 import dev.sebastiano.ricohsync.vendors.ricoh.RicohCameraVendor
 import dev.sebastiano.ricohsync.vendors.sony.SonyCameraVendor
 
-/**
- * Application-level configuration and dependency creation for RicohSync.
- */
+/** Application-level configuration and dependency creation for RicohSync. */
 object RicohSyncApp {
 
     /**
@@ -24,13 +22,14 @@ object RicohSyncApp {
      */
     fun createVendorRegistry(): CameraVendorRegistry {
         return DefaultCameraVendorRegistry(
-            vendors = listOf(
-                RicohCameraVendor,
-                SonyCameraVendor,
-                // Add more vendors here:
-                // CanonCameraVendor,
-                // NikonCameraVendor,
-            ),
+            vendors =
+                listOf(
+                    RicohCameraVendor,
+                    SonyCameraVendor,
+                    // Add more vendors here:
+                    // CanonCameraVendor,
+                    // NikonCameraVendor,
+                )
         )
     }
 }

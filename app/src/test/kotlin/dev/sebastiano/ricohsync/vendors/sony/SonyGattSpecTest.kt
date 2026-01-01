@@ -93,13 +93,19 @@ class SonyGattSpecTest {
     @Test
     fun `dateTime uses location service and data write characteristic`() {
         assertEquals(SonyGattSpec.LOCATION_SERVICE_UUID, SonyGattSpec.dateTimeServiceUuid)
-        assertEquals(SonyGattSpec.LOCATION_DATA_WRITE_CHARACTERISTIC_UUID, SonyGattSpec.dateTimeCharacteristicUuid)
+        assertEquals(
+            SonyGattSpec.LOCATION_DATA_WRITE_CHARACTERISTIC_UUID,
+            SonyGattSpec.dateTimeCharacteristicUuid,
+        )
     }
 
     @Test
     fun `location uses location service and data write characteristic`() {
         assertEquals(SonyGattSpec.LOCATION_SERVICE_UUID, SonyGattSpec.locationServiceUuid)
-        assertEquals(SonyGattSpec.LOCATION_DATA_WRITE_CHARACTERISTIC_UUID, SonyGattSpec.locationCharacteristicUuid)
+        assertEquals(
+            SonyGattSpec.LOCATION_DATA_WRITE_CHARACTERISTIC_UUID,
+            SonyGattSpec.locationCharacteristicUuid,
+        )
     }
 
     @Test

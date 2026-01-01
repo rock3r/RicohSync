@@ -15,30 +15,27 @@ import dev.sebastiano.ricohsync.RicohSyncApp
 import dev.sebastiano.ricohsync.domain.model.Camera
 import dev.sebastiano.ricohsync.domain.repository.PairedDevicesRepository
 import dev.sebastiano.ricohsync.domain.vendor.CameraVendorRegistry
+import kotlin.uuid.ExperimentalUuidApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.launch
-import kotlin.uuid.ExperimentalUuidApi
 
 private const val TAG = "PairingViewModel"
 
 /**
  * ViewModel for the pairing screen.
  *
- * Manages BLE scanning for supported cameras and handles the pairing process.
- * Excludes already-paired devices from the scan results.
+ * Manages BLE scanning for supported cameras and handles the pairing process. Excludes
+ * already-paired devices from the scan results.
  */
 @OptIn(ExperimentalUuidApi::class)
-class PairingViewModel(
-    private val pairedDevicesRepository: PairedDevicesRepository,
-) : ViewModel() {
+class PairingViewModel(private val pairedDevicesRepository: PairedDevicesRepository) : ViewModel() {
 
     private val _state = mutableStateOf<PairingScreenState>(PairingScreenState.Idle)
     val state: State<PairingScreenState> = _state
@@ -58,35 +55,29 @@ class PairingViewModel(
             level = Logging.Level.Events
             format = Logging.Format.Multiline
         }
-        scanSettings = ScanSettings.Builder()
-            .setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY)
-            .build()
+        scanSettings =
+            ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY).build()
     }
 
     private val discoveredDevices = mutableMapOf<String, Camera>()
 
-    /**
-     * Starts scanning for cameras.
-     */
+    /** Starts scanning for cameras. */
     fun startScanning() {
         if (scanJob != null) return
 
         discoveredDevices.clear()
         _state.value = PairingScreenState.Scanning(emptyList())
 
-        scanJob = scanner.advertisements
-            .onEach { advertisement ->
-                onDiscovery(advertisement)
-            }
-            .onStart { Log.i(TAG, "BLE scan started") }
-            .onCompletion { Log.i(TAG, "BLE scan completed") }
-            .flowOn(Dispatchers.IO)
-            .launchIn(viewModelScope)
+        scanJob =
+            scanner.advertisements
+                .onEach { advertisement -> onDiscovery(advertisement) }
+                .onStart { Log.i(TAG, "BLE scan started") }
+                .onCompletion { Log.i(TAG, "BLE scan completed") }
+                .flowOn(Dispatchers.IO)
+                .launchIn(viewModelScope)
     }
 
-    /**
-     * Stops the current scan.
-     */
+    /** Stops the current scan. */
     fun stopScanning() {
         scanJob?.cancel("Stopping scan")
         scanJob = null
@@ -110,57 +101,54 @@ class PairingViewModel(
 
         val currentState = _state.value
         if (currentState is PairingScreenState.Scanning) {
-            _state.value = PairingScreenState.Scanning(
-                discoveredDevices = discoveredDevices.values.toList()
-                    .sortedByDescending { it.name }
-            )
+            _state.value =
+                PairingScreenState.Scanning(
+                    discoveredDevices =
+                        discoveredDevices.values.toList().sortedByDescending { it.name }
+                )
         }
     }
 
-    /**
-     * Starts pairing with the selected camera.
-     */
+    /** Starts pairing with the selected camera. */
     fun pairDevice(camera: Camera) {
         stopScanning()
         _state.value = PairingScreenState.Pairing(camera)
 
-        pairingJob = viewModelScope.launch(Dispatchers.IO) {
-            try {
-                // Add device to repository (this is the "pairing" - we store the device)
-                // The actual BLE connection will happen when the device is enabled
-                pairedDevicesRepository.addDevice(camera, enabled = true)
+        pairingJob =
+            viewModelScope.launch(Dispatchers.IO) {
+                try {
+                    // Add device to repository (this is the "pairing" - we store the device)
+                    // The actual BLE connection will happen when the device is enabled
+                    pairedDevicesRepository.addDevice(camera, enabled = true)
 
-                Log.i(TAG, "Device paired successfully: ${camera.name ?: camera.macAddress}")
-                _state.value = PairingScreenState.Pairing(camera, success = true)
-            } catch (e: Exception) {
-                Log.e(TAG, "Pairing failed", e)
-                val error = when {
-                    e.message?.contains("reject", ignoreCase = true) == true -> PairingError.REJECTED
-                    e.message?.contains("timeout", ignoreCase = true) == true -> PairingError.TIMEOUT
-                    else -> PairingError.UNKNOWN
+                    Log.i(TAG, "Device paired successfully: ${camera.name ?: camera.macAddress}")
+                    _state.value = PairingScreenState.Pairing(camera, success = true)
+                } catch (e: Exception) {
+                    Log.e(TAG, "Pairing failed", e)
+                    val error =
+                        when {
+                            e.message?.contains("reject", ignoreCase = true) == true ->
+                                PairingError.REJECTED
+                            e.message?.contains("timeout", ignoreCase = true) == true ->
+                                PairingError.TIMEOUT
+                            else -> PairingError.UNKNOWN
+                        }
+                    _state.value = PairingScreenState.Pairing(camera, error = error)
                 }
-                _state.value = PairingScreenState.Pairing(camera, error = error)
             }
-        }
     }
 
-    /**
-     * Cancels the current pairing attempt.
-     */
+    /** Cancels the current pairing attempt. */
     fun cancelPairing() {
         pairingJob?.cancel()
         pairingJob = null
         _state.value = PairingScreenState.Idle
     }
 
-    /**
-     * Converts a BLE advertisement to a Camera by identifying the vendor.
-     */
+    /** Converts a BLE advertisement to a Camera by identifying the vendor. */
     private fun PlatformAdvertisement.toCamera(): Camera? {
-        val vendor = vendorRegistry.identifyVendor(
-            deviceName = peripheralName ?: name,
-            serviceUuids = uuids,
-        )
+        val vendor =
+            vendorRegistry.identifyVendor(deviceName = peripheralName ?: name, serviceUuids = uuids)
 
         if (vendor == null) {
             Log.w(TAG, "No vendor recognized for device: ${peripheralName ?: name}")
@@ -183,18 +171,14 @@ class PairingViewModel(
     }
 }
 
-/**
- * State of the pairing screen.
- */
+/** State of the pairing screen. */
 sealed interface PairingScreenState {
     /** Initial state, ready to scan. */
     data object Idle : PairingScreenState
 
     /** Actively scanning for cameras. */
-    data class Scanning(
-        val discoveredDevices: List<Camera>,
-        val isScanning: Boolean = true,
-    ) : PairingScreenState
+    data class Scanning(val discoveredDevices: List<Camera>, val isScanning: Boolean = true) :
+        PairingScreenState
 
     /** Pairing with a selected camera. */
     data class Pairing(
@@ -203,4 +187,3 @@ sealed interface PairingScreenState {
         val success: Boolean = false,
     ) : PairingScreenState
 }
-

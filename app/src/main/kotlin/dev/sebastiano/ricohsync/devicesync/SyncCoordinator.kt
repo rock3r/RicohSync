@@ -9,6 +9,7 @@ import dev.sebastiano.ricohsync.domain.model.SyncState
 import dev.sebastiano.ricohsync.domain.repository.CameraConnection
 import dev.sebastiano.ricohsync.domain.repository.CameraRepository
 import dev.sebastiano.ricohsync.domain.repository.LocationRepository
+import dev.sebastiano.ricohsync.domain.repository.PairedDevicesRepository
 import java.time.ZonedDateTime
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -27,17 +28,19 @@ private const val TAG = "SyncCoordinator"
 /**
  * Coordinates the synchronization process between the phone and Ricoh camera.
  *
- * This class contains the core sync business logic, decoupled from Android services
- * for easier testing.
+ * This class contains the core sync business logic, decoupled from Android services for easier
+ * testing.
  *
  * @param cameraRepository Repository for camera BLE operations.
  * @param locationRepository Repository for GPS location updates.
+ * @param pairedDevicesRepository Repository for managing paired devices.
  * @param coroutineScope Scope for launching coroutines.
  * @param deviceNameProvider Provider for the device name to set on the camera.
  */
 class SyncCoordinator(
     private val cameraRepository: CameraRepository,
     private val locationRepository: LocationRepository,
+    private val pairedDevicesRepository: PairedDevicesRepository,
     private val coroutineScope: CoroutineScope,
     private val deviceNameProvider: () -> String = { "${Build.MODEL} RicohSync" },
 ) {
@@ -66,32 +69,34 @@ class SyncCoordinator(
 
         _state.value = SyncState.Connecting(camera)
 
-        syncJob = coroutineScope.launch {
-            try {
-                val connection = cameraRepository.connect(camera)
-                currentConnection = connection
+        syncJob =
+            coroutineScope.launch {
+                try {
+                    val connection = cameraRepository.connect(camera)
+                    currentConnection = connection
 
-                val firmwareVersion = performInitialSetup(connection)
+                    val firmwareVersion = performInitialSetup(connection)
 
-                _state.value = SyncState.Syncing(
-                    camera = camera,
-                    firmwareVersion = firmwareVersion,
-                    lastSyncInfo = null,
-                )
+                    _state.value =
+                        SyncState.Syncing(
+                            camera = camera,
+                            firmwareVersion = firmwareVersion,
+                            lastSyncInfo = null,
+                        )
 
-                startLocationSync(connection, camera, firmwareVersion)
-            } catch (e: CancellationException) {
-                Log.i(TAG, "Sync cancelled")
-                throw e
-            } catch (e: Exception) {
-                Log.e(TAG, "Sync error", e)
-                _state.value = SyncState.Disconnected(camera)
-            } finally {
-                currentConnection?.disconnect()
-                currentConnection = null
-                syncJob = null
+                    startLocationSync(connection, camera, firmwareVersion)
+                } catch (e: CancellationException) {
+                    Log.i(TAG, "Sync cancelled")
+                    throw e
+                } catch (e: Exception) {
+                    Log.e(TAG, "Sync error", e)
+                    _state.value = SyncState.Disconnected(camera)
+                } finally {
+                    currentConnection?.disconnect()
+                    currentConnection = null
+                    syncJob = null
+                }
             }
-        }
     }
 
     /**
@@ -118,9 +123,7 @@ class SyncCoordinator(
         return firmwareVersion
     }
 
-    /**
-     * Starts continuous location sync with the camera.
-     */
+    /** Starts continuous location sync with the camera. */
     private suspend fun startLocationSync(
         connection: CameraConnection,
         camera: Camera,
@@ -128,20 +131,17 @@ class SyncCoordinator(
     ) {
         locationRepository.startLocationUpdates()
 
-        val connectionMonitoringJob = coroutineScope.launch {
-            connection.isConnected
-                .filter { !it }
-                .first()
-            Log.i(TAG, "Connection lost for ${camera.macAddress}")
-            syncJob?.cancel(CancellationException("Connection lost"))
-        }
+        val connectionMonitoringJob =
+            coroutineScope.launch {
+                connection.isConnected.filter { !it }.first()
+                Log.i(TAG, "Connection lost for ${camera.macAddress}")
+                syncJob?.cancel(CancellationException("Connection lost"))
+            }
 
         try {
-            locationRepository.locationUpdates
-                .filterNotNull()
-                .collect { location ->
-                    syncLocationToCamera(connection, location, camera, firmwareVersion)
-                }
+            locationRepository.locationUpdates.filterNotNull().collect { location ->
+                syncLocationToCamera(connection, location, camera, firmwareVersion)
+            }
         } catch (e: CancellationException) {
             Log.i(TAG, "Location sync cancelled")
             if (_state.value != SyncState.Stopped) {
@@ -162,22 +162,21 @@ class SyncCoordinator(
     ) {
         connection.syncLocation(location)
 
+        // Update persistent last sync timestamp
+        pairedDevicesRepository.updateLastSyncedAt(camera.macAddress, System.currentTimeMillis())
+
         _state.update { currentState ->
-            val syncing = currentState as? SyncState.Syncing
-                ?: SyncState.Syncing(camera, firmwareVersion, null)
+            val syncing =
+                currentState as? SyncState.Syncing
+                    ?: SyncState.Syncing(camera, firmwareVersion, null)
 
             syncing.copy(
-                lastSyncInfo = LocationSyncInfo(
-                    syncTime = ZonedDateTime.now(),
-                    location = location,
-                ),
+                lastSyncInfo = LocationSyncInfo(syncTime = ZonedDateTime.now(), location = location)
             )
         }
     }
 
-    /**
-     * Stops syncing and disconnects from the camera.
-     */
+    /** Stops syncing and disconnects from the camera. */
     suspend fun stopSync() {
         Log.i(TAG, "Stopping sync")
         _state.value = SyncState.Stopped
@@ -198,9 +197,7 @@ class SyncCoordinator(
         locationRepository.stopLocationUpdates()
     }
 
-    /**
-     * Checks if a sync is currently in progress.
-     */
+    /** Checks if a sync is currently in progress. */
     fun isSyncing(): Boolean = syncJob != null
 
     /**

@@ -14,14 +14,15 @@ private const val TAG = "SyncErrorVibrator"
 /**
  * Handles vibration notifications for sync errors.
  *
- * It provides an aggressive vibration pattern designed to be felt in a pocket
- * and implements a 5-minute cooldown between vibrations.
+ * It provides an aggressive vibration pattern designed to be felt in a pocket and implements a
+ * 5-minute cooldown between vibrations.
  */
 class SyncErrorVibrator(private val context: Context) {
 
     private val vibrator: Vibrator by lazy {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            val vibratorManager = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
+            val vibratorManager =
+                context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
             vibratorManager.defaultVibrator
         } else {
             @Suppress("DEPRECATION")
@@ -30,15 +31,13 @@ class SyncErrorVibrator(private val context: Context) {
     }
 
     /**
-     * Aggressive vibration pattern for pocket detection:
-     * Vibrate 500ms, pause 200ms, repeat 3 times.
+     * Aggressive vibration pattern for pocket detection: Vibrate 500ms, pause 200ms, repeat 3
+     * times.
      */
     private val aggressivePattern = longArrayOf(0, 500, 200, 500, 200, 500)
     private val aggressiveAmplitudes = intArrayOf(0, 255, 0, 255, 0, 255)
 
-    /**
-     * Triggers an aggressive vibration if the 5-minute cooldown has passed.
-     */
+    /** Triggers an aggressive vibration if the 5-minute cooldown has passed. */
     fun vibrate() {
         val now = Instant.now()
         val lastTime = lastVibrationTime
@@ -57,16 +56,15 @@ class SyncErrorVibrator(private val context: Context) {
         lastVibrationTime = now
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            vibrator.vibrate(VibrationEffect.createWaveform(aggressivePattern, aggressiveAmplitudes, -1))
+            vibrator.vibrate(
+                VibrationEffect.createWaveform(aggressivePattern, aggressiveAmplitudes, -1)
+            )
         } else {
-            @Suppress("DEPRECATION")
-            vibrator.vibrate(aggressivePattern, -1)
+            @Suppress("DEPRECATION") vibrator.vibrate(aggressivePattern, -1)
         }
     }
 
-    /**
-     * Stops any ongoing vibration.
-     */
+    /** Stops any ongoing vibration. */
     fun stop() {
         Log.d(TAG, "Stopping vibration")
         vibrator.cancel()
@@ -76,4 +74,3 @@ class SyncErrorVibrator(private val context: Context) {
         private var lastVibrationTime: Instant? = null
     }
 }
-

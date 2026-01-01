@@ -1,18 +1,16 @@
 package dev.sebastiano.ricohsync.fakes
 
+import dev.sebastiano.ricohsync.domain.model.GpsLocation
 import dev.sebastiano.ricohsync.domain.vendor.CameraCapabilities
 import dev.sebastiano.ricohsync.domain.vendor.CameraGattSpec
 import dev.sebastiano.ricohsync.domain.vendor.CameraProtocol
 import dev.sebastiano.ricohsync.domain.vendor.CameraVendor
 import dev.sebastiano.ricohsync.domain.vendor.CameraVendorRegistry
-import dev.sebastiano.ricohsync.domain.model.GpsLocation
 import java.time.ZonedDateTime
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
-/**
- * Fake implementation of [CameraVendorRegistry] for testing.
- */
+/** Fake implementation of [CameraVendorRegistry] for testing. */
 @OptIn(ExperimentalUuidApi::class)
 class FakeVendorRegistry : CameraVendorRegistry {
 
@@ -45,9 +43,7 @@ class FakeVendorRegistry : CameraVendorRegistry {
     }
 }
 
-/**
- * Fake camera vendor for testing.
- */
+/** Fake camera vendor for testing. */
 @OptIn(ExperimentalUuidApi::class)
 object FakeCameraVendor : CameraVendor {
     override val vendorId: String = "fake"
@@ -60,13 +56,14 @@ object FakeCameraVendor : CameraVendor {
             serviceUuids.any { it == FakeGattSpec.scanFilterServiceUuids.first() }
     }
 
-    override fun getCapabilities(): CameraCapabilities = CameraCapabilities(
-        supportsFirmwareVersion = true,
-        supportsDeviceName = true,
-        supportsDateTimeSync = true,
-        supportsGeoTagging = true,
-        supportsLocationSync = true,
-    )
+    override fun getCapabilities(): CameraCapabilities =
+        CameraCapabilities(
+            supportsFirmwareVersion = true,
+            supportsDeviceName = true,
+            supportsDateTimeSync = true,
+            supportsGeoTagging = true,
+            supportsLocationSync = true,
+        )
 }
 
 @OptIn(ExperimentalUuidApi::class)
@@ -87,10 +84,16 @@ object FakeGattSpec : CameraGattSpec {
 
 object FakeProtocol : CameraProtocol {
     override fun encodeDateTime(dateTime: ZonedDateTime): ByteArray = byteArrayOf()
-    override fun decodeDateTime(bytes: ByteArray): String = "decoded-datetime"
-    override fun encodeLocation(location: GpsLocation): ByteArray = byteArrayOf()
-    override fun decodeLocation(bytes: ByteArray): String = "decoded-location"
-    override fun encodeGeoTaggingEnabled(enabled: Boolean): ByteArray = byteArrayOf(if (enabled) 1 else 0)
-    override fun decodeGeoTaggingEnabled(bytes: ByteArray): Boolean = bytes.firstOrNull() == 1.toByte()
-}
 
+    override fun decodeDateTime(bytes: ByteArray): String = "decoded-datetime"
+
+    override fun encodeLocation(location: GpsLocation): ByteArray = byteArrayOf()
+
+    override fun decodeLocation(bytes: ByteArray): String = "decoded-location"
+
+    override fun encodeGeoTaggingEnabled(enabled: Boolean): ByteArray =
+        byteArrayOf(if (enabled) 1 else 0)
+
+    override fun decodeGeoTaggingEnabled(bytes: ByteArray): Boolean =
+        bytes.firstOrNull() == 1.toByte()
+}

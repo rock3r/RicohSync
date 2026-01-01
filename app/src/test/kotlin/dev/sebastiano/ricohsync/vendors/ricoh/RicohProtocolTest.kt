@@ -59,24 +59,26 @@ class RicohProtocolTest {
 
     @Test
     fun `encodeLocation produces correct byte array size`() {
-        val location = GpsLocation(
-            latitude = 37.7749,
-            longitude = -122.4194,
-            altitude = 10.0,
-            timestamp = ZonedDateTime.of(2024, 12, 25, 14, 30, 45, 0, ZoneId.of("UTC")),
-        )
+        val location =
+            GpsLocation(
+                latitude = 37.7749,
+                longitude = -122.4194,
+                altitude = 10.0,
+                timestamp = ZonedDateTime.of(2024, 12, 25, 14, 30, 45, 0, ZoneId.of("UTC")),
+            )
         val encoded = RicohProtocol.encodeLocation(location)
         assertEquals(RicohProtocol.LOCATION_SIZE, encoded.size)
     }
 
     @Test
     fun `encodeLocation and decodeLocation are inverse operations`() {
-        val location = GpsLocation(
-            latitude = 37.7749,
-            longitude = -122.4194,
-            altitude = 10.5,
-            timestamp = ZonedDateTime.of(2024, 12, 25, 14, 30, 45, 0, ZoneId.of("UTC")),
-        )
+        val location =
+            GpsLocation(
+                latitude = 37.7749,
+                longitude = -122.4194,
+                altitude = 10.5,
+                timestamp = ZonedDateTime.of(2024, 12, 25, 14, 30, 45, 0, ZoneId.of("UTC")),
+            )
 
         val encoded = RicohProtocol.encodeLocation(location)
         val decoded = RicohProtocol.decodeLocation(encoded)
@@ -107,12 +109,13 @@ class RicohProtocolTest {
 
     @Test
     fun `formatLocationHex produces expected format`() {
-        val location = GpsLocation(
-            latitude = 37.7749,
-            longitude = -122.4194,
-            altitude = 10.0,
-            timestamp = ZonedDateTime.of(2024, 12, 25, 14, 30, 45, 0, ZoneId.of("UTC")),
-        )
+        val location =
+            GpsLocation(
+                latitude = 37.7749,
+                longitude = -122.4194,
+                altitude = 10.0,
+                timestamp = ZonedDateTime.of(2024, 12, 25, 14, 30, 45, 0, ZoneId.of("UTC")),
+            )
         val encoded = RicohProtocol.encodeLocation(location)
         val hex = RicohProtocol.formatLocationHex(encoded)
 

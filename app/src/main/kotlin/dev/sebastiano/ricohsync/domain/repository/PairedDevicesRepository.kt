@@ -7,20 +7,19 @@ import kotlinx.coroutines.flow.Flow
 /**
  * Repository interface for managing paired camera devices.
  *
- * This repository handles persistence of paired devices and their enabled state.
- * The actual BLE connections are managed separately by the CameraRepository.
+ * This repository handles persistence of paired devices and their enabled state. The actual BLE
+ * connections are managed separately by the CameraRepository.
  */
 interface PairedDevicesRepository {
 
     /**
-     * Flow of all paired devices.
-     * Emits whenever the list changes (device added, removed, or enabled state changed).
+     * Flow of all paired devices. Emits whenever the list changes (device added, removed, or
+     * enabled state changed).
      */
     val pairedDevices: Flow<List<PairedDevice>>
 
     /**
-     * Flow of enabled devices only.
-     * Useful for determining which devices should be auto-connected.
+     * Flow of enabled devices only. Useful for determining which devices should be auto-connected.
      */
     val enabledDevices: Flow<List<PairedDevice>>
 
@@ -42,8 +41,8 @@ interface PairedDevicesRepository {
     /**
      * Enables or disables a paired device.
      *
-     * When enabled, the device will be auto-connected when in range.
-     * When disabled, any existing connection should be closed.
+     * When enabled, the device will be auto-connected when in range. When disabled, any existing
+     * connection should be closed.
      *
      * @param macAddress The MAC address of the device.
      * @param enabled Whether to enable or disable the device.
@@ -51,13 +50,20 @@ interface PairedDevicesRepository {
     suspend fun setDeviceEnabled(macAddress: String, enabled: Boolean)
 
     /**
-     * Updates the stored name for a device.
-     * Useful when the device advertises a different name.
+     * Updates the stored name for a device. Useful when the device advertises a different name.
      *
      * @param macAddress The MAC address of the device.
      * @param name The new name to store.
      */
     suspend fun updateDeviceName(macAddress: String, name: String?)
+
+    /**
+     * Updates the last successful sync timestamp for a device.
+     *
+     * @param macAddress The MAC address of the device.
+     * @param timestamp The timestamp (millis since epoch).
+     */
+    suspend fun updateLastSyncedAt(macAddress: String, timestamp: Long)
 
     /**
      * Checks if a device with the given MAC address is already paired.
@@ -75,14 +81,9 @@ interface PairedDevicesRepository {
      */
     suspend fun getDevice(macAddress: String): PairedDevice?
 
-    /**
-     * Checks if there are any paired devices.
-     */
+    /** Checks if there are any paired devices. */
     suspend fun hasAnyDevices(): Boolean
 
-    /**
-     * Checks if there are any enabled devices.
-     */
+    /** Checks if there are any enabled devices. */
     suspend fun hasEnabledDevices(): Boolean
 }
-

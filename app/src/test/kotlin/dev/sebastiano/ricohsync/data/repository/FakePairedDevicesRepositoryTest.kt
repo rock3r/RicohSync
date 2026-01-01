@@ -19,19 +19,21 @@ class FakePairedDevicesRepositoryTest {
 
     private lateinit var repository: FakePairedDevicesRepository
 
-    private val testCamera = Camera(
-        identifier = "00:11:22:33:44:55",
-        name = "Test Camera",
-        macAddress = "00:11:22:33:44:55",
-        vendor = FakeCameraVendor,
-    )
+    private val testCamera =
+        Camera(
+            identifier = "00:11:22:33:44:55",
+            name = "Test Camera",
+            macAddress = "00:11:22:33:44:55",
+            vendor = FakeCameraVendor,
+        )
 
-    private val testDevice = PairedDevice(
-        macAddress = "00:11:22:33:44:55",
-        name = "Test Camera",
-        vendorId = "fake",
-        isEnabled = true,
-    )
+    private val testDevice =
+        PairedDevice(
+            macAddress = "00:11:22:33:44:55",
+            name = "Test Camera",
+            vendorId = "fake",
+            isEnabled = true,
+        )
 
     @Before
     fun setUp() {
@@ -99,7 +101,7 @@ class FakePairedDevicesRepositoryTest {
                 name = "Disabled Device",
                 vendorId = "fake",
                 isEnabled = false,
-            ),
+            )
         )
 
         val enabledDevices = repository.enabledDevices.first()
@@ -158,6 +160,17 @@ class FakePairedDevicesRepositoryTest {
     }
 
     @Test
+    fun `updateLastSyncedAt updates timestamp`() = runTest {
+        repository.addTestDevice(testDevice)
+        val timestamp = 123456789L
+
+        repository.updateLastSyncedAt(testDevice.macAddress, timestamp)
+
+        val device = repository.getDevice(testDevice.macAddress)
+        assertEquals(timestamp, device?.lastSyncedAt)
+    }
+
+    @Test
     fun `clear removes all devices`() = runTest {
         repository.addTestDevice(testDevice)
         repository.addTestDevice(
@@ -166,7 +179,7 @@ class FakePairedDevicesRepositoryTest {
                 name = "Another Device",
                 vendorId = "fake",
                 isEnabled = true,
-            ),
+            )
         )
 
         repository.clear()
@@ -185,4 +198,3 @@ class FakePairedDevicesRepositoryTest {
         assertNull(repository.lastAddedCamera)
     }
 }
-
