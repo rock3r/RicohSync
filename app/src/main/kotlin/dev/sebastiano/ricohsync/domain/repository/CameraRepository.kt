@@ -32,9 +32,12 @@ interface CameraRepository {
     /**
      * Connects to the specified camera.
      *
+     * @param camera The camera to connect to.
+     * @param onFound Optional callback called when the camera is found during scanning, before
+     *   connecting.
      * @return A [CameraConnection] for interacting with the connected camera.
      */
-    suspend fun connect(camera: Camera): CameraConnection
+    suspend fun connect(camera: Camera, onFound: (() -> Unit)? = null): CameraConnection
 }
 
 /**

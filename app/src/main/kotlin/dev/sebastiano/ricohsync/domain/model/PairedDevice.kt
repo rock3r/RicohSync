@@ -31,8 +31,14 @@ sealed interface DeviceConnectionState {
     /** Device is enabled but not yet connected. */
     data object Disconnected : DeviceConnectionState
 
+    /** Actively looking for the device in the area. */
+    data object Searching : DeviceConnectionState
+
     /** Actively trying to connect to the device. */
     data object Connecting : DeviceConnectionState
+
+    /** Device is not reachable after a searching attempt. */
+    data object Unreachable : DeviceConnectionState
 
     /** Connected and ready for sync. */
     data class Connected(val firmwareVersion: String? = null) : DeviceConnectionState

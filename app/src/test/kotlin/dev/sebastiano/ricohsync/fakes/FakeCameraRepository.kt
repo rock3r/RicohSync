@@ -38,9 +38,10 @@ class FakeCameraRepository : CameraRepository {
         cameraToReturn?.let { emit(it) }
     }
 
-    override suspend fun connect(camera: Camera): CameraConnection {
+    override suspend fun connect(camera: Camera, onFound: (() -> Unit)?): CameraConnection {
         connectCallCount++
         if (connectDelay > 0) delay(connectDelay)
+        onFound?.invoke()
         connectException?.let { throw it }
         return connectionToReturn ?: FakeCameraConnection(camera)
     }

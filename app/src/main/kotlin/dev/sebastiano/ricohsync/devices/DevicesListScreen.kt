@@ -83,6 +83,7 @@ import dev.sebastiano.ricohsync.domain.model.DeviceConnectionState
 import dev.sebastiano.ricohsync.domain.model.GpsLocation
 import dev.sebastiano.ricohsync.domain.model.PairedDeviceWithState
 import java.time.ZonedDateTime
+import kotlin.text.replaceFirstChar
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeMark
 import kotlin.time.TimeSource
@@ -307,7 +308,7 @@ private fun DeviceCard(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         ConnectionStatusText(connectionState)
 
-                        if (device.lastSyncedAt != null) {
+                        if (device.lastSyncedAt != null && connectionState is DeviceConnectionState.Syncing) {
                             Text(
                                 text = " • ${formatElapsedTimeSince(device.lastSyncedAt)}",
                                 style = MaterialTheme.typography.bodySmall,
@@ -320,10 +321,10 @@ private fun DeviceCard(
                     }
                 }
 
-                Spacer(Modifier.width(8.dp))
-
                 // Enable/disable switch
                 Switch(checked = device.isEnabled, onCheckedChange = onEnabledChange)
+
+                Spacer(Modifier.width(8.dp))
 
                 // Expand indicator
                 Icon(
@@ -355,6 +356,17 @@ private fun DeviceCard(
                         connectionState.firmwareVersion?.let { version ->
                             DeviceDetailRow("Firmware", version)
                         }
+                    }
+
+                    if (connectionState is DeviceConnectionState.Unreachable) {
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            text = "Camera not found nearby.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        TextButton(onClick = onRetryClick) { Text("Retry connection") }
                     }
 
                     if (connectionState is DeviceConnectionState.Error) {
@@ -397,8 +409,18 @@ private fun ConnectionStatusIcon(state: DeviceConnectionState) {
             is DeviceConnectionState.Disconnected ->
                 Triple(Icons.Rounded.Bluetooth, MaterialTheme.colorScheme.onSurfaceVariant, false)
 
+            is DeviceConnectionState.Searching ->
+                Triple(Icons.Rounded.Bluetooth, MaterialTheme.colorScheme.primary, true)
+
             is DeviceConnectionState.Connecting ->
                 Triple(Icons.Rounded.Bluetooth, MaterialTheme.colorScheme.primary, true)
+
+            is DeviceConnectionState.Unreachable ->
+                Triple(
+                    Icons.Rounded.Bluetooth,
+                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                    false,
+                )
 
             is DeviceConnectionState.Connected ->
                 Triple(Icons.Rounded.BluetoothConnected, MaterialTheme.colorScheme.primary, false)
@@ -453,11 +475,16 @@ private fun ConnectionStatusText(state: DeviceConnectionState) {
             is DeviceConnectionState.Disconnected ->
                 "Disconnected" to MaterialTheme.colorScheme.onSurfaceVariant
 
+            is DeviceConnectionState.Searching ->
+                "Searching..." to MaterialTheme.colorScheme.primary
             is DeviceConnectionState.Connecting ->
                 "Connecting..." to MaterialTheme.colorScheme.primary
 
+            is DeviceConnectionState.Unreachable ->
+                "Unreachable" to MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+
             is DeviceConnectionState.Connected -> "Connected" to MaterialTheme.colorScheme.primary
-            is DeviceConnectionState.Error -> "Error" to MaterialTheme.colorScheme.error
+            is DeviceConnectionState.Error -> state.message to MaterialTheme.colorScheme.error
             is DeviceConnectionState.Syncing -> "Syncing" to MaterialTheme.colorScheme.primary
         }
 

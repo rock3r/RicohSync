@@ -79,7 +79,7 @@ class KableCameraRepository(private val vendorRegistry: CameraVendorRegistry) : 
         return scanner.advertisements.mapNotNull { it.toCamera() }
     }
 
-    override suspend fun connect(camera: Camera): CameraConnection {
+    override suspend fun connect(camera: Camera, onFound: (() -> Unit)?): CameraConnection {
         // We need to scan for the device first to get the Advertisement
         // This is a limitation of Kable - we need the Advertisement to create a Peripheral
         val scanner =
@@ -88,6 +88,7 @@ class KableCameraRepository(private val vendorRegistry: CameraVendorRegistry) : 
             }
 
         val advertisement = scanner.advertisements.first()
+        onFound?.invoke()
 
         val peripheral =
             Peripheral(advertisement) {

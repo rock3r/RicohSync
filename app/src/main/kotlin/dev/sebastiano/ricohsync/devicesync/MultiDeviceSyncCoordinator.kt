@@ -71,7 +71,11 @@ class MultiDeviceSyncCoordinator(
     /** Flow that emits true when a scan/discovery pass is in progress. */
     val isScanning: StateFlow<Boolean> =
         combine(_isScanning, _deviceStates) { scanning, states ->
-                scanning || states.values.any { it is DeviceConnectionState.Connecting }
+                scanning ||
+                    states.values.any {
+                        it is DeviceConnectionState.Connecting ||
+                            it is DeviceConnectionState.Searching
+                    }
             }
             .stateIn(coroutineScope, SharingStarted.Eagerly, false)
 
@@ -131,6 +135,7 @@ class MultiDeviceSyncCoordinator(
 
                     if (
                         state is DeviceConnectionState.Disconnected ||
+                            state is DeviceConnectionState.Unreachable ||
                             (state is DeviceConnectionState.Error && state.isRecoverable)
                     ) {
                         Log.d(
@@ -181,8 +186,8 @@ class MultiDeviceSyncCoordinator(
                 return
             }
 
-            // Set state to connecting immediately before launching the job
-            updateDeviceState(macAddress, DeviceConnectionState.Connecting)
+            // Set state to searching immediately before launching the job
+            updateDeviceState(macAddress, DeviceConnectionState.Searching)
 
             val job =
                 coroutineScope.launch {
@@ -192,7 +197,18 @@ class MultiDeviceSyncCoordinator(
                         locationCollector.registerDevice(macAddress)
 
                         Log.d(TAG, "Starting connection attempt for $macAddress...")
-                        val connection = withTimeout(30_000L) { connectToCamera(camera) }
+                        val connection =
+                            withTimeout(30_000L) {
+                                connectToCamera(
+                                    camera,
+                                    onFound = {
+                                        updateDeviceState(
+                                            macAddress,
+                                            DeviceConnectionState.Connecting,
+                                        )
+                                    },
+                                )
+                            }
 
                         jobsMutex.withLock { deviceConnections[macAddress] = connection }
 
@@ -217,12 +233,7 @@ class MultiDeviceSyncCoordinator(
                         cleanup(macAddress, preserveErrorState = false)
                     } catch (e: TimeoutCancellationException) {
                         Log.e(TAG, "Connection timed out for $macAddress")
-                        updateDeviceState(
-                            macAddress,
-                            DeviceConnectionState.Error(
-                                message = "Connection timed out. Is the camera nearby?"
-                            ),
-                        )
+                        updateDeviceState(macAddress, DeviceConnectionState.Unreachable)
                         cleanup(macAddress, preserveErrorState = true)
                     } catch (e: CancellationException) {
                         Log.i(TAG, "Sync cancelled for $macAddress")
@@ -249,9 +260,12 @@ class MultiDeviceSyncCoordinator(
         }
     }
 
-    private suspend fun connectToCamera(camera: Camera): CameraConnection {
+    private suspend fun connectToCamera(
+        camera: Camera,
+        onFound: (() -> Unit)? = null,
+    ): CameraConnection {
         Log.i(TAG, "Connecting to ${camera.name ?: camera.macAddress}...")
-        return cameraRepository.connect(camera)
+        return cameraRepository.connect(camera, onFound)
     }
 
     private suspend fun performInitialSetup(connection: CameraConnection): String {
@@ -472,7 +486,10 @@ class MultiDeviceSyncCoordinator(
         val macAddress = device.macAddress
         val currentState = getDeviceState(macAddress)
 
-        if (currentState is DeviceConnectionState.Error && currentState.isRecoverable) {
+        if (
+            currentState is DeviceConnectionState.Unreachable ||
+                (currentState is DeviceConnectionState.Error && currentState.isRecoverable)
+        ) {
             Log.i(TAG, "Retrying connection for $macAddress")
             startDeviceSync(device)
         }

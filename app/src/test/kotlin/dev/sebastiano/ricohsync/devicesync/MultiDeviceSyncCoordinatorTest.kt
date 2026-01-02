@@ -104,15 +104,32 @@ class MultiDeviceSyncCoordinatorTest {
         }
 
     @Test
-    fun `startDeviceSync transitions to Connecting state`() =
+    fun `startDeviceSync transitions to Searching state`() =
         testScope.runTest {
             cameraRepository.connectDelay = 1000L
 
             coordinator.startDeviceSync(testDevice1)
 
             assertEquals(
-                DeviceConnectionState.Connecting,
+                DeviceConnectionState.Searching,
                 coordinator.getDeviceState(testDevice1.macAddress),
+            )
+        }
+
+    @Test
+    fun `startDeviceSync transitions from Searching to Connecting when device found`() =
+        testScope.runTest {
+            // We can't easily test the intermediate Connecting state with UnconfinedTestDispatcher
+            // because the onFound callback is called synchronously in our fake
+            val connection = FakeCameraConnection(testDevice1.toTestCamera())
+            cameraRepository.connectionToReturn = connection
+
+            coordinator.startDeviceSync(testDevice1)
+            advanceUntilIdle()
+
+            // Should end up in Syncing
+            assertTrue(
+                coordinator.getDeviceState(testDevice1.macAddress) is DeviceConnectionState.Syncing
             )
         }
 
@@ -228,6 +245,18 @@ class MultiDeviceSyncCoordinatorTest {
             advanceUntilIdle()
 
             assertEquals(0, coordinator.getConnectedDeviceCount())
+        }
+
+    @Test
+    fun `connection timeout updates state to Unreachable`() =
+        testScope.runTest {
+            cameraRepository.connectDelay = 60_000L // Longer than 30s timeout
+
+            coordinator.startDeviceSync(testDevice1)
+            advanceUntilIdle()
+
+            val state = coordinator.getDeviceState(testDevice1.macAddress)
+            assertEquals(DeviceConnectionState.Unreachable, state)
         }
 
     @Test
