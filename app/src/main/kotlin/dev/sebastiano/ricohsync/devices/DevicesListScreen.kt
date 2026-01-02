@@ -4,6 +4,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.EaseInOut
 import androidx.compose.animation.core.InfiniteRepeatableSpec
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.rememberInfiniteTransition
@@ -24,6 +25,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
@@ -33,6 +35,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.LinkedCamera
+import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Bluetooth
 import androidx.compose.material.icons.rounded.BluetoothConnected
@@ -83,6 +88,9 @@ import dev.sebastiano.ricohsync.domain.model.DeviceConnectionState
 import dev.sebastiano.ricohsync.domain.model.GpsLocation
 import dev.sebastiano.ricohsync.domain.model.PairedDeviceWithState
 import java.time.ZonedDateTime
+import kotlin.math.PI
+import kotlin.math.cos
+import kotlin.math.sin
 import kotlin.text.replaceFirstChar
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeMark
@@ -342,7 +350,7 @@ private fun DeviceCard(
             ) {
                 Column(
                     modifier =
-                        Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 16.dp)
+                        Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 8.dp)
                 ) {
                     // Device details
                     DeviceDetailRow("MAC Address", device.macAddress)
@@ -397,39 +405,31 @@ private fun DeviceCard(
 
 @Composable
 private fun ConnectionStatusIcon(state: DeviceConnectionState) {
-    val (icon, color, shouldAnimate) =
+    val (icon, color) =
         when (state) {
             is DeviceConnectionState.Disabled ->
-                Triple(
-                    Icons.Rounded.BluetoothDisabled,
-                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                    false,
-                )
+                Icons.Default.PhotoCamera to MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
 
             is DeviceConnectionState.Disconnected ->
-                Triple(Icons.Rounded.Bluetooth, MaterialTheme.colorScheme.onSurfaceVariant, false)
+                Icons.Default.PhotoCamera to MaterialTheme.colorScheme.onSurfaceVariant
 
             is DeviceConnectionState.Searching ->
-                Triple(Icons.Rounded.Bluetooth, MaterialTheme.colorScheme.primary, true)
+                Icons.Default.Search to MaterialTheme.colorScheme.primary
 
             is DeviceConnectionState.Connecting ->
-                Triple(Icons.Rounded.Bluetooth, MaterialTheme.colorScheme.primary, true)
+                Icons.Default.LinkedCamera to MaterialTheme.colorScheme.primary
 
             is DeviceConnectionState.Unreachable ->
-                Triple(
-                    Icons.Rounded.Bluetooth,
-                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                    false,
-                )
+                Icons.Default.PhotoCamera to MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
 
             is DeviceConnectionState.Connected ->
-                Triple(Icons.Rounded.BluetoothConnected, MaterialTheme.colorScheme.primary, false)
-
-            is DeviceConnectionState.Error ->
-                Triple(Icons.Rounded.Error, MaterialTheme.colorScheme.error, false)
+                Icons.Default.LinkedCamera to MaterialTheme.colorScheme.primary
 
             is DeviceConnectionState.Syncing ->
-                Triple(Icons.Rounded.Sync, MaterialTheme.colorScheme.primary, true)
+                Icons.Default.LinkedCamera to MaterialTheme.colorScheme.primary
+
+            is DeviceConnectionState.Error ->
+                Icons.Rounded.Error to MaterialTheme.colorScheme.error
         }
 
     val animatedColor by animateColorAsState(targetValue = color, label = "status_color")
@@ -439,28 +439,80 @@ private fun ConnectionStatusIcon(state: DeviceConnectionState) {
             Modifier.size(40.dp).clip(CircleShape).background(animatedColor.copy(alpha = 0.15f)),
         contentAlignment = Alignment.Center,
     ) {
-        if (shouldAnimate) {
-            val infiniteTransition = rememberInfiniteTransition(label = "icon_animation")
-            val rotation by
-                infiniteTransition.animateFloat(
-                    initialValue = 0f,
-                    targetValue = if (state is DeviceConnectionState.Syncing) -360f else 360f,
-                    animationSpec =
-                        InfiniteRepeatableSpec(
-                            animation = tween(1500, easing = EaseInOut),
-                            repeatMode = RepeatMode.Restart,
-                        ),
-                    label = "rotation",
-                )
+        val infiniteTransition = rememberInfiniteTransition(label = "icon_animation")
 
-            Icon(
-                icon,
-                contentDescription = null,
-                tint = animatedColor,
-                modifier = Modifier.rotate(rotation),
-            )
-        } else {
-            Icon(icon, contentDescription = null, tint = animatedColor)
+        when (state) {
+            is DeviceConnectionState.Searching -> {
+                val angle by
+                    infiniteTransition.animateFloat(
+                        initialValue = 0f,
+                        targetValue = 360f,
+                        animationSpec =
+                            InfiniteRepeatableSpec(
+                                animation = tween(1500, easing = LinearEasing),
+                                repeatMode = RepeatMode.Restart,
+                            ),
+                        label = "searching_rotation",
+                    )
+
+                // Move in a small circle
+                val radius = 2.dp
+                val x = radius * cos(angle.toDouble() * (PI / 180.0)).toFloat()
+                val y = radius * sin(angle.toDouble() * (PI / 180.0)).toFloat()
+
+                Icon(
+                    icon,
+                    contentDescription = null,
+                    tint = animatedColor,
+                    modifier = Modifier.offset(x = x, y = y),
+                )
+            }
+
+            is DeviceConnectionState.Connecting -> {
+                val alpha by
+                    infiniteTransition.animateFloat(
+                        initialValue = 0.3f,
+                        targetValue = 1f,
+                        animationSpec =
+                            InfiniteRepeatableSpec(
+                                animation = tween(800, easing = EaseInOut),
+                                repeatMode = RepeatMode.Reverse,
+                            ),
+                        label = "connecting_blink",
+                    )
+
+                Icon(
+                    icon,
+                    contentDescription = null,
+                    tint = animatedColor,
+                    modifier = Modifier.alpha(alpha),
+                )
+            }
+
+            is DeviceConnectionState.Syncing -> {
+                val rotation by
+                    infiniteTransition.animateFloat(
+                        initialValue = 0f,
+                        targetValue = 360f,
+                        animationSpec =
+                            InfiniteRepeatableSpec(
+                                animation = tween(1500, easing = LinearEasing),
+                                repeatMode = RepeatMode.Restart,
+                            ),
+                        label = "syncing_rotation",
+                    )
+
+                Icon(
+                    icon,
+                    contentDescription = null,
+                    tint = animatedColor,
+                    modifier = Modifier.rotate(rotation),
+                )
+            }
+
+            else -> {
+                Icon(icon, contentDescription = null, tint = animatedColor)
+            }
         }
     }
 }
@@ -498,12 +550,13 @@ private fun DeviceDetailRow(label: String, value: String) {
             text = label,
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.width(100.dp),
+            modifier = Modifier.width(100.dp).alignByBaseline(),
         )
         Text(
             text = value,
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.alignByBaseline(),
         )
     }
 }
