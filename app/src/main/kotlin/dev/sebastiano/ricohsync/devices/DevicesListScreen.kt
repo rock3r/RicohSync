@@ -72,9 +72,21 @@ import dev.sebastiano.ricohsync.devicesync.formatElapsedTimeSince
 import dev.sebastiano.ricohsync.domain.model.DeviceConnectionState
 import dev.sebastiano.ricohsync.domain.model.GpsLocation
 import dev.sebastiano.ricohsync.domain.model.PairedDeviceWithState
+import java.time.ZonedDateTime
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.TimeMark
+import kotlin.time.TimeSource
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import org.maplibre.compose.camera.CameraPosition
 import org.maplibre.compose.camera.rememberCameraState
+import org.maplibre.compose.location.Location
+import org.maplibre.compose.location.LocationProvider
+import org.maplibre.compose.location.LocationPuck
+import org.maplibre.compose.location.rememberUserLocationState
+import org.maplibre.compose.map.MapOptions
 import org.maplibre.compose.map.MaplibreMap
+import org.maplibre.compose.map.OrnamentOptions
 import org.maplibre.compose.style.BaseStyle
 import org.maplibre.spatialk.geojson.Position
 
@@ -364,14 +376,19 @@ private fun ConnectionStatusIcon(state: DeviceConnectionState) {
                     MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
                     false,
                 )
+
             is DeviceConnectionState.Disconnected ->
                 Triple(Icons.Rounded.Bluetooth, MaterialTheme.colorScheme.onSurfaceVariant, false)
+
             is DeviceConnectionState.Connecting ->
                 Triple(Icons.Rounded.Bluetooth, MaterialTheme.colorScheme.primary, true)
+
             is DeviceConnectionState.Connected ->
                 Triple(Icons.Rounded.BluetoothConnected, MaterialTheme.colorScheme.primary, false)
+
             is DeviceConnectionState.Error ->
                 Triple(Icons.Rounded.Error, MaterialTheme.colorScheme.error, false)
+
             is DeviceConnectionState.Syncing ->
                 Triple(Icons.Rounded.Sync, MaterialTheme.colorScheme.primary, true)
         }
@@ -415,10 +432,13 @@ private fun ConnectionStatusText(state: DeviceConnectionState) {
         when (state) {
             is DeviceConnectionState.Disabled ->
                 "Disabled" to MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+
             is DeviceConnectionState.Disconnected ->
                 "Disconnected" to MaterialTheme.colorScheme.onSurfaceVariant
+
             is DeviceConnectionState.Connecting ->
                 "Connecting..." to MaterialTheme.colorScheme.primary
+
             is DeviceConnectionState.Connected -> "Connected" to MaterialTheme.colorScheme.primary
             is DeviceConnectionState.Error -> "Error" to MaterialTheme.colorScheme.error
             is DeviceConnectionState.Syncing -> "Syncing" to MaterialTheme.colorScheme.primary
@@ -470,7 +490,7 @@ private fun UnpairConfirmationDialog(
 @Composable
 private fun SyncStoppedWarning(onRefreshClick: () -> Unit, modifier: Modifier = Modifier) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
         colors =
             CardDefaults.cardColors(
@@ -505,7 +525,7 @@ private fun SyncStoppedWarning(onRefreshClick: () -> Unit, modifier: Modifier = 
 @Composable
 private fun LocationCard(location: GpsLocation?, modifier: Modifier = Modifier) {
     Card(
-        modifier = Modifier.fillMaxWidth().height(200.dp),
+        modifier = modifier.fillMaxWidth().height(200.dp),
         shape = RoundedCornerShape(16.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
     ) {
@@ -536,23 +556,64 @@ private fun LocationCard(location: GpsLocation?, modifier: Modifier = Modifier) 
                 )
 
             // Update camera when location changes
+            val locationFlow = remember { MutableStateFlow(location.toMapBoxLocation()) }
             LaunchedEffect(location) {
                 cameraState.position =
                     CameraPosition(
                         target = Position(location.longitude, location.latitude),
                         zoom = cameraState.position.zoom, // Keep current zoom
                     )
+                locationFlow.value = location.toMapBoxLocation()
             }
 
+            val userState =
+                rememberUserLocationState(
+                    object : LocationProvider {
+                        override val location: StateFlow<Location?> = locationFlow
+                    }
+                )
             MaplibreMap(
                 modifier = Modifier.fillMaxSize(),
                 baseStyle = BaseStyle.Uri(mapStyle),
                 cameraState = cameraState,
+                options =
+                    MapOptions(
+                        ornamentOptions =
+                            OrnamentOptions(
+                                isLogoEnabled = false,
+                                isCompassEnabled = true,
+                                isScaleBarEnabled = false,
+                            )
+                    ),
             ) {
-                // Blue dot and accuracy circle omitted for now to ensure compilation
+                LocationPuck(
+                    idPrefix = "user-location",
+                    cameraState = cameraState,
+                    locationState = userState,
+                )
             }
         }
     }
+}
+
+private fun GpsLocation.toMapBoxLocation() =
+    Location(
+        Position(longitude, latitude),
+        accuracy.toDouble(),
+        bearing = null,
+        bearingAccuracy = null,
+        speed = null,
+        speedAccuracy = null,
+        timestamp.toTimeMark(),
+    )
+
+private fun ZonedDateTime.toTimeMark(): TimeMark {
+    val now = ZonedDateTime.now()
+    // Calculate the difference in milliseconds
+    val diffMillis = toInstant().toEpochMilli() - now.toInstant().toEpochMilli()
+
+    // Create a mark that is 'diff' away from the current monotonic 'now'
+    return TimeSource.Monotonic.markNow() + diffMillis.milliseconds
 }
 
 private fun Double.format(decimals: Int): String = "%.${decimals}f".format(this)
