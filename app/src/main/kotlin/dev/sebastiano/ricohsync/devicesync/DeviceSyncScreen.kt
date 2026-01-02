@@ -34,6 +34,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import java.util.Locale
 import kotlin.time.Duration.Companion.seconds
@@ -47,7 +48,13 @@ internal fun DeviceSyncScreen(viewModel: DeviceSyncViewModel) {
         modifier = Modifier.fillMaxSize(),
         topBar = {
             TopAppBar(
-                title = { Text("Syncing with camera") },
+                title = { 
+                    Text(
+                        "Syncing with camera",
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold
+                    ) 
+                },
                 actions = {
                     if (state is DeviceSyncState.Syncing) {
                         IconButton(viewModel::stopSyncAndDisconnect) {
@@ -120,7 +127,12 @@ private fun Syncing(state: DeviceSyncState.Syncing) {
         Spacer(Modifier.height(24.dp))
 
         val name = remember(state.camera) { state.camera.name ?: state.camera.identifier }
-        Text("Syncing data to $name...", style = MaterialTheme.typography.bodyLarge)
+        Text(
+            "Syncing data to $name...", 
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary
+        )
 
         if (state.firmwareVersion != null) {
             Spacer(Modifier.height(8.dp))

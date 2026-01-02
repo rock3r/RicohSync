@@ -25,6 +25,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import dev.sebastiano.ricohsync.domain.model.Camera
 
@@ -39,7 +40,15 @@ internal fun ScanningScreen(viewModel: ScanningViewModel, onDeviceSelected: (Cam
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         topBar = {
-            TopAppBar(title = { Text(if (isScanning) "Scanning..." else "Discovered cameras") })
+            TopAppBar(
+                title = { 
+                    Text(
+                        if (isScanning) "Scanning..." else "Discovered cameras",
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold
+                    ) 
+                }
+            )
         },
         floatingActionButton = {
             FloatingActionButton(

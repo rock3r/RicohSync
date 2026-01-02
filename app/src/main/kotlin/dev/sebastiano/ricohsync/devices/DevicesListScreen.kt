@@ -77,6 +77,7 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -124,7 +125,13 @@ fun DevicesListScreen(viewModel: DevicesListViewModel, onAddDeviceClick: () -> U
         modifier = Modifier.fillMaxSize(),
         topBar = {
             TopAppBar(
-                title = { Text("RicohSync") },
+                title = { 
+                    Text(
+                        "RicohSync",
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.Bold
+                    ) 
+                },
                 actions = {
                     val currentState = state
                     if (currentState is DevicesListState.HasDevices) {
@@ -232,8 +239,9 @@ private fun EmptyContent(modifier: Modifier = Modifier, onAddDeviceClick: () -> 
 
             Text(
                 "No cameras paired",
-                style = MaterialTheme.typography.titleLarge,
+                style = MaterialTheme.typography.headlineSmall,
                 color = MaterialTheme.colorScheme.onSurface,
+                fontWeight = FontWeight.Bold,
             )
 
             Spacer(Modifier.height(8.dp))
@@ -290,8 +298,11 @@ private fun DeviceCard(
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        shape = MaterialTheme.shapes.medium,
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+        )
     ) {
         Column {
             // Main row
@@ -599,7 +610,7 @@ private fun SyncStoppedWarning(
 ) {
     Card(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        shape = MaterialTheme.shapes.medium,
         colors =
             CardDefaults.cardColors(
                 containerColor = MaterialTheme.colorScheme.errorContainer,
@@ -634,8 +645,8 @@ private fun SyncStoppedWarning(
 private fun LocationCard(location: GpsLocation?, modifier: Modifier = Modifier) {
     Card(
         modifier = modifier.fillMaxWidth().height(200.dp),
-        shape = RoundedCornerShape(16.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        shape = MaterialTheme.shapes.medium,
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
         if (location == null) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {

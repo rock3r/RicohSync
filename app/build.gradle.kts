@@ -13,7 +13,7 @@ android {
     defaultConfig {
         applicationId = "dev.sebastiano.ricohsync"
         minSdk = 33
-        targetSdk = 35
+        targetSdk = 36
         versionCode = 1
         versionName = "1.0"
     }
@@ -32,7 +32,7 @@ android {
         targetCompatibility = JavaVersion.VERSION_11
     }
     buildFeatures { compose = true }
-    adbOptions { installOptions("--user", "0") }
+    installation { installOptions += listOf("--user", "0") }
 }
 
 ktfmt { kotlinLangStyle() }
@@ -50,6 +50,7 @@ dependencies {
     implementation(libs.androidx.material3)
     implementation(libs.androidx.material.icons)
     implementation(libs.androidx.ui)
+    implementation(libs.androidx.ui.text.google.fonts)
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.kable)
