@@ -276,6 +276,10 @@ class MultiDeviceSyncService : Service(), CoroutineScope {
 
     private suspend fun stopAllAndShutdown() {
         syncCoordinator.stopAllDevices()
+        deviceMonitorJob?.cancel()
+        deviceMonitorJob = null
+        stateCollectionJob?.cancel()
+        stateCollectionJob = null
         _serviceState.value = MultiDeviceSyncServiceState.Stopped
         ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
         NotificationManagerCompat.from(this).cancel(NOTIFICATION_ID)

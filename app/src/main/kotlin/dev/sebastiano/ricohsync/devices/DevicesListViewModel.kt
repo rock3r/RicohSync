@@ -147,9 +147,10 @@ class DevicesListViewModel(
         viewModelScope.launch(Dispatchers.IO) {
             pairedDevicesRepository.setDeviceEnabled(macAddress, enabled)
 
-            // Start service if we just enabled a device, service isn't running, AND global sync is
-            // enabled
-            if (enabled && service == null && pairedDevicesRepository.isSyncEnabled.first()) {
+            // Start service if we just enabled a device AND global sync is enabled
+            // We call startService even if service is already bound, to ensure onStartCommand is
+            // triggered and monitoring starts if it was stopped.
+            if (enabled && pairedDevicesRepository.isSyncEnabled.first()) {
                 val context = bindingContextProvider()
                 context.startService(Intent(context, MultiDeviceSyncService::class.java))
             }
