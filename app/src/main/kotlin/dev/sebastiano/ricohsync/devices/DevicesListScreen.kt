@@ -39,15 +39,12 @@ import androidx.compose.material.icons.filled.LinkedCamera
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.rounded.Add
-import androidx.compose.material.icons.rounded.Bluetooth
-import androidx.compose.material.icons.rounded.BluetoothConnected
 import androidx.compose.material.icons.rounded.BluetoothDisabled
 import androidx.compose.material.icons.rounded.CameraAlt
 import androidx.compose.material.icons.rounded.Error
 import androidx.compose.material.icons.rounded.ExpandLess
 import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.Refresh
-import androidx.compose.material.icons.rounded.Sync
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonColors
 import androidx.compose.material3.ButtonDefaults
@@ -129,8 +126,13 @@ fun DevicesListScreen(viewModel: DevicesListViewModel, onAddDeviceClick: () -> U
             TopAppBar(
                 title = { Text("RicohSync") },
                 actions = {
-                    if (state is DevicesListState.HasDevices) {
-                        IconButton(onClick = { viewModel.refreshConnections() }) {
+                    val currentState = state
+                    if (currentState is DevicesListState.HasDevices) {
+                        val hasEnabledCameras = currentState.devices.any { it.device.isEnabled }
+                        IconButton(
+                            onClick = { viewModel.refreshConnections() },
+                            enabled = hasEnabledCameras,
+                        ) {
                             Icon(Icons.Rounded.Refresh, contentDescription = "Refresh connections")
                         }
                     }
@@ -172,6 +174,7 @@ fun DevicesListScreen(viewModel: DevicesListViewModel, onAddDeviceClick: () -> U
                     if (!currentState.isSyncEnabled) {
                         SyncStoppedWarning(
                             onRefreshClick = { viewModel.refreshConnections() },
+                            enabled = currentState.devices.any { it.device.isEnabled },
                             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
                         )
                     }
@@ -316,7 +319,10 @@ private fun DeviceCard(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         ConnectionStatusText(connectionState)
 
-                        if (device.lastSyncedAt != null && connectionState is DeviceConnectionState.Syncing) {
+                        if (
+                            device.lastSyncedAt != null &&
+                                connectionState is DeviceConnectionState.Syncing
+                        ) {
                             Text(
                                 text = " • ${formatElapsedTimeSince(device.lastSyncedAt)}",
                                 style = MaterialTheme.typography.bodySmall,
@@ -408,7 +414,8 @@ private fun ConnectionStatusIcon(state: DeviceConnectionState) {
     val (icon, color) =
         when (state) {
             is DeviceConnectionState.Disabled ->
-                Icons.Default.PhotoCamera to MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                Icons.Default.PhotoCamera to
+                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
 
             is DeviceConnectionState.Disconnected ->
                 Icons.Default.PhotoCamera to MaterialTheme.colorScheme.onSurfaceVariant
@@ -420,7 +427,8 @@ private fun ConnectionStatusIcon(state: DeviceConnectionState) {
                 Icons.Default.LinkedCamera to MaterialTheme.colorScheme.primary
 
             is DeviceConnectionState.Unreachable ->
-                Icons.Default.PhotoCamera to MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                Icons.Default.PhotoCamera to
+                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
 
             is DeviceConnectionState.Connected ->
                 Icons.Default.LinkedCamera to MaterialTheme.colorScheme.primary
@@ -428,8 +436,7 @@ private fun ConnectionStatusIcon(state: DeviceConnectionState) {
             is DeviceConnectionState.Syncing ->
                 Icons.Default.LinkedCamera to MaterialTheme.colorScheme.primary
 
-            is DeviceConnectionState.Error ->
-                Icons.Rounded.Error to MaterialTheme.colorScheme.error
+            is DeviceConnectionState.Error -> Icons.Rounded.Error to MaterialTheme.colorScheme.error
         }
 
     val animatedColor by animateColorAsState(targetValue = color, label = "status_color")
@@ -585,7 +592,11 @@ private fun UnpairConfirmationDialog(
 }
 
 @Composable
-private fun SyncStoppedWarning(onRefreshClick: () -> Unit, modifier: Modifier = Modifier) {
+private fun SyncStoppedWarning(
+    onRefreshClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+) {
     Card(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
@@ -612,7 +623,7 @@ private fun SyncStoppedWarning(onRefreshClick: () -> Unit, modifier: Modifier = 
                 )
             }
 
-            IconButton(onClick = onRefreshClick) {
+            IconButton(onClick = onRefreshClick, enabled = enabled) {
                 Icon(Icons.Rounded.Refresh, contentDescription = "Resume searching")
             }
         }
@@ -678,7 +689,16 @@ private fun LocationCard(location: GpsLocation?, modifier: Modifier = Modifier) 
                     baseStyle = BaseStyle.Uri(mapStyle),
                     styleState = styleState,
                     cameraState = cameraState,
-                    options = MapOptions(ornamentOptions = OrnamentOptions.AllDisabled),
+                    options =
+                        MapOptions(
+                            ornamentOptions =
+                                OrnamentOptions(
+                                    padding = PaddingValues(8.dp),
+                                    isScaleBarEnabled = false,
+                                    isLogoEnabled = false,
+                                    isCompassEnabled = false,
+                                )
+                        ),
                 ) {
                     LocationPuck(
                         idPrefix = "user-location",
@@ -701,12 +721,6 @@ private fun LocationCard(location: GpsLocation?, modifier: Modifier = Modifier) 
                                 zoom = cameraState.position.zoom, // Keep current zoom
                             )
                     }
-                    Spacer(Modifier.weight(1f))
-                    ExpandingAttributionButton(
-                        cameraState = cameraState,
-                        styleState = styleState,
-                        contentAlignment = Alignment.BottomEnd,
-                    )
                 }
             }
         }
