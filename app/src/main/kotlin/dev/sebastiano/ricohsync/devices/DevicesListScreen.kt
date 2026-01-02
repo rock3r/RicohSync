@@ -10,6 +10,7 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -19,10 +20,12 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -41,9 +44,12 @@ import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Sync
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ButtonColors
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ElevatedButton
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -56,7 +62,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -66,7 +71,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import dev.sebastiano.ricohsync.devicesync.formatElapsedTimeSince
 import dev.sebastiano.ricohsync.domain.model.DeviceConnectionState
@@ -83,11 +93,18 @@ import org.maplibre.compose.camera.rememberCameraState
 import org.maplibre.compose.location.Location
 import org.maplibre.compose.location.LocationProvider
 import org.maplibre.compose.location.LocationPuck
+import org.maplibre.compose.location.LocationPuckColors
+import org.maplibre.compose.location.LocationPuckSizes
+import org.maplibre.compose.location.LocationTrackingEffect
 import org.maplibre.compose.location.rememberUserLocationState
 import org.maplibre.compose.map.MapOptions
 import org.maplibre.compose.map.MaplibreMap
 import org.maplibre.compose.map.OrnamentOptions
+import org.maplibre.compose.material3.CompassButton
+import org.maplibre.compose.material3.ExpandingAttributionButton
+import org.maplibre.compose.material3.LocationPuckDefaults
 import org.maplibre.compose.style.BaseStyle
+import org.maplibre.compose.style.rememberStyleState
 import org.maplibre.spatialk.geojson.Position
 
 /** Main screen showing the list of paired devices with their sync status. */
@@ -231,7 +248,7 @@ private fun DevicesList(
         contentPadding =
             PaddingValues(
                 start = 16.dp,
-                top = 8.dp,
+                top = 0.dp,
                 end = 16.dp,
                 bottom = 80.dp, // Room for FAB
             ),
@@ -557,14 +574,6 @@ private fun LocationCard(location: GpsLocation?, modifier: Modifier = Modifier) 
 
             // Update camera when location changes
             val locationFlow = remember { MutableStateFlow(location.toMapBoxLocation()) }
-            LaunchedEffect(location) {
-                cameraState.position =
-                    CameraPosition(
-                        target = Position(location.longitude, location.latitude),
-                        zoom = cameraState.position.zoom, // Keep current zoom
-                    )
-                locationFlow.value = location.toMapBoxLocation()
-            }
 
             val userState =
                 rememberUserLocationState(
@@ -572,25 +581,53 @@ private fun LocationCard(location: GpsLocation?, modifier: Modifier = Modifier) 
                         override val location: StateFlow<Location?> = locationFlow
                     }
                 )
-            MaplibreMap(
-                modifier = Modifier.fillMaxSize(),
-                baseStyle = BaseStyle.Uri(mapStyle),
-                cameraState = cameraState,
-                options =
-                    MapOptions(
-                        ornamentOptions =
-                            OrnamentOptions(
-                                isLogoEnabled = false,
-                                isCompassEnabled = true,
-                                isScaleBarEnabled = false,
-                            )
-                    ),
-            ) {
-                LocationPuck(
-                    idPrefix = "user-location",
-                    cameraState = cameraState,
-                    locationState = userState,
+            LocationTrackingEffect(userState) {
+                cameraState.animateTo(
+                    CameraPosition(
+                        target = Position(location.longitude, location.latitude),
+                        zoom = cameraState.position.zoom, // Keep current zoom
+                    )
                 )
+                locationFlow.value = location.toMapBoxLocation()
+            }
+
+            val styleState = rememberStyleState()
+            Box(modifier = Modifier.fillMaxSize()) {
+                MaplibreMap(
+                    modifier = Modifier.fillMaxSize(),
+                    baseStyle = BaseStyle.Uri(mapStyle),
+                    styleState = styleState,
+                    cameraState = cameraState,
+                    options = MapOptions(ornamentOptions = OrnamentOptions.AllDisabled),
+                ) {
+                    LocationPuck(
+                        idPrefix = "user-location",
+                        cameraState = cameraState,
+                        locationState = userState,
+                        colors = LocationPuckDefaults.colors(),
+                    )
+                }
+
+                Column(
+                    Modifier.align(Alignment.TopEnd).padding(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalAlignment = Alignment.End,
+                ) {
+                    CompassButton(cameraState)
+                    UserLocationButton {
+                        cameraState.position =
+                            CameraPosition(
+                                target = Position(location.longitude, location.latitude),
+                                zoom = cameraState.position.zoom, // Keep current zoom
+                            )
+                    }
+                    Spacer(Modifier.weight(1f))
+                    ExpandingAttributionButton(
+                        cameraState = cameraState,
+                        styleState = styleState,
+                        contentAlignment = Alignment.BottomEnd,
+                    )
+                }
             }
         }
     }
@@ -616,4 +653,32 @@ private fun ZonedDateTime.toTimeMark(): TimeMark {
     return TimeSource.Monotonic.markNow() + diffMillis.milliseconds
 }
 
-private fun Double.format(decimals: Int): String = "%.${decimals}f".format(this)
+@Composable
+private fun UserLocationButton(
+    modifier: Modifier = Modifier,
+    colors: ButtonColors = ButtonDefaults.elevatedButtonColors(),
+    puckColors: LocationPuckColors = LocationPuckDefaults.colors(),
+    puckSizes: LocationPuckSizes = LocationPuckSizes(),
+    contentDescription: String = "User location",
+    size: Dp = 48.dp,
+    contentPadding: PaddingValues = PaddingValues(size / 6),
+    shape: Shape = CircleShape,
+    onClick: () -> Unit,
+) {
+    ElevatedButton(
+        modifier = modifier.requiredSize(size).aspectRatio(1f),
+        onClick = onClick,
+        shape = shape,
+        colors = colors,
+        contentPadding = contentPadding,
+    ) {
+        Canvas(modifier = Modifier.semantics { this.contentDescription = contentDescription }) {
+            drawCircle(
+                puckColors.dotStrokeColor,
+                puckSizes.dotRadius.toPx(),
+                style = Stroke(puckSizes.dotStrokeWidth.toPx()),
+            )
+            drawCircle(puckColors.dotFillColorCurrentLocation, puckSizes.dotRadius.toPx())
+        }
+    }
+}
