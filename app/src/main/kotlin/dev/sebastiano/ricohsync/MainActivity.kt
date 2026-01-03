@@ -1,5 +1,9 @@
 package dev.sebastiano.ricohsync
 
+import android.Manifest.permission.ACCESS_FINE_LOCATION
+import android.Manifest.permission.BLUETOOTH_CONNECT
+import android.Manifest.permission.BLUETOOTH_SCAN
+import android.Manifest.permission.POST_NOTIFICATIONS
 import android.content.Context
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -11,10 +15,13 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
 import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.ui.NavDisplay
+import com.google.accompanist.permissions.ExperimentalPermissionsApi
+import com.google.accompanist.permissions.rememberMultiplePermissionsState
 import dev.sebastiano.ricohsync.data.repository.DataStorePairedDevicesRepository
 import dev.sebastiano.ricohsync.data.repository.FusedLocationRepository
 import dev.sebastiano.ricohsync.data.repository.pairedDevicesDataStoreV2
@@ -53,6 +60,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+@OptIn(ExperimentalPermissionsApi::class)
 @Composable
 private fun RootComposable(
     viewModel: MainViewModel,
@@ -61,7 +69,27 @@ private fun RootComposable(
     context: Context,
 ) {
     RicohSyncTheme {
+        val allPermissions =
+            listOf(ACCESS_FINE_LOCATION, BLUETOOTH_SCAN, BLUETOOTH_CONNECT, POST_NOTIFICATIONS)
+        val multiplePermissionsState =
+            rememberMultiplePermissionsState(permissions = allPermissions)
+
+        // Initialize backStack - will be updated if permissions are already granted
         val backStack = remember { mutableStateListOf<NavRoute>(NavRoute.NeedsPermissions) }
+
+        // Check if permissions are already granted and navigate to DevicesList
+        // This handles both startup (when permissions are already granted) and runtime (when user
+        // grants permissions)
+        LaunchedEffect(multiplePermissionsState.allPermissionsGranted) {
+            if (
+                multiplePermissionsState.allPermissionsGranted &&
+                    backStack.contains(NavRoute.NeedsPermissions)
+            ) {
+                // Replace NeedsPermissions with DevicesList
+                val needsPermissionsIndex = backStack.indexOf(NavRoute.NeedsPermissions)
+                backStack[needsPermissionsIndex] = NavRoute.DevicesList
+            }
+        }
 
         NavDisplay(
             backStack = backStack,
