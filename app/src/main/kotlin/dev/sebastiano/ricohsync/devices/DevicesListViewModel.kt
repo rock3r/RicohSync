@@ -205,14 +205,15 @@ class DevicesListViewModel(
             devices.groupBy { device ->
                 val vendor = vendorRegistry.getVendorById(device.vendorId)
                 val make = vendor?.vendorName ?: device.vendorId.replaceFirstChar { it.uppercase() }
-                val model = device.name ?: "Unknown"
+                val model =
+                    vendor?.extractModelFromPairingName(device.name) ?: device.name ?: "Unknown"
                 MakeModel(make, model)
             }
 
         return devices.associate { device ->
             val vendor = vendorRegistry.getVendorById(device.vendorId)
             val make = vendor?.vendorName ?: device.vendorId.replaceFirstChar { it.uppercase() }
-            val model = device.name ?: "Unknown"
+            val model = vendor?.extractModelFromPairingName(device.name) ?: device.name ?: "Unknown"
             val makeModel = MakeModel(make, model)
             val showPairingName = (makeModelGroups[makeModel]?.size ?: 0) > 1
 

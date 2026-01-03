@@ -48,6 +48,19 @@ interface CameraVendor {
      * version reading, etc.).
      */
     fun getCapabilities(): CameraCapabilities
+
+    /**
+     * Extracts the camera model from a pairing name.
+     *
+     * This method attempts to identify the actual camera model from the pairing name, which may
+     * have been customized by the user. For example, if a user renamed their "GR IIIx" to "My
+     * Camera", this method should still return "GR IIIx" as the model.
+     *
+     * @param pairingName The pairing name (may be user-customized).
+     * @return The extracted model name, or the pairing name itself if the model cannot be
+     *   determined.
+     */
+    fun extractModelFromPairingName(pairingName: String?): String
 }
 
 /** Defines the BLE GATT service and characteristic UUIDs for a camera vendor. */

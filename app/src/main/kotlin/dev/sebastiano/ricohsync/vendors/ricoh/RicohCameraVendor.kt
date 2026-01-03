@@ -52,4 +52,40 @@ object RicohCameraVendor : CameraVendor {
             supportsLocationSync = true,
         )
     }
+
+    override fun extractModelFromPairingName(pairingName: String?): String {
+        if (pairingName == null) return "Unknown"
+
+        val name = pairingName.trim()
+
+        // Try to extract known Ricoh GR model patterns
+        // Check for "GR IIIx" first (more specific)
+        if (name.contains("GR IIIx", ignoreCase = true)) {
+            return "GR IIIx"
+        }
+
+        // Check for "GR III" (but not "GR IIIx" which we already handled)
+        if (
+            name.contains("GR III", ignoreCase = true) &&
+                !name.contains("GR IIIx", ignoreCase = true)
+        ) {
+            return "GR III"
+        }
+
+        // Check for other GR models
+        val grPattern = Regex("GR\\s+(\\d+[a-z]?)", RegexOption.IGNORE_CASE)
+        grPattern.find(name)?.let { match ->
+            return "GR ${match.groupValues[1]}"
+        }
+
+        // If name starts with "GR" or "RICOH", assume it might be a model name
+        if (
+            name.startsWith("GR", ignoreCase = true) || name.startsWith("RICOH", ignoreCase = true)
+        ) {
+            return name
+        }
+
+        // Fallback: return the pairing name as-is
+        return name
+    }
 }

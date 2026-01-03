@@ -64,6 +64,11 @@ object FakeCameraVendor : CameraVendor {
             supportsGeoTagging = true,
             supportsLocationSync = true,
         )
+
+    override fun extractModelFromPairingName(pairingName: String?): String {
+        // For fake vendor, just return the pairing name as-is
+        return pairingName ?: "Unknown"
+    }
 }
 
 @OptIn(ExperimentalUuidApi::class)

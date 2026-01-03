@@ -302,13 +302,22 @@ internal class KableCameraConnection(
         }
 
         val service =
-            peripheral.services.value.orEmpty().first {
+            peripheral.services.value.orEmpty().firstOrNull {
                 it.serviceUuid == gattSpec.locationServiceUuid
             }
+                ?: throw IllegalStateException(
+                    "Location service not found. Service UUID: ${gattSpec.locationServiceUuid}. " +
+                        "Available services: ${peripheral.services.value?.map { it.serviceUuid } ?: "N/A"}"
+                )
+
         val char =
-            service.characteristics.first {
+            service.characteristics.firstOrNull {
                 it.characteristicUuid == gattSpec.locationCharacteristicUuid
             }
+                ?: throw IllegalStateException(
+                    "Location characteristic not found. Characteristic UUID: ${gattSpec.locationCharacteristicUuid}. " +
+                        "Available characteristics in service ${service.serviceUuid}: ${service.characteristics.map { it.characteristicUuid }}"
+                )
 
         val data = protocol.encodeLocation(location)
         Log.info(tag = TAG) { "Syncing location: ${protocol.decodeLocation(data)}" }
