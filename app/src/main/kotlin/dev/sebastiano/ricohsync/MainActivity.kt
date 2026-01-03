@@ -110,11 +110,13 @@ private fun RootComposable(
                             viewModel = pairingViewModel,
                             onNavigateBack = {
                                 // Can't use removeLast before API 35
-                                if (backStack.isNotEmpty()) backStack.removeAt(backStack.lastIndex)
+                                // Ensure we don't remove the last item (must keep at least one route)
+                                if (backStack.size > 1) backStack.removeAt(backStack.lastIndex)
                             },
                             onDevicePaired = {
                                 // Can't use removeLast before API 35
-                                if (backStack.isNotEmpty()) backStack.removeAt(backStack.lastIndex)
+                                // Ensure we don't remove the last item (must keep at least one route)
+                                if (backStack.size > 1) backStack.removeAt(backStack.lastIndex)
                             },
                         )
                     }

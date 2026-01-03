@@ -1,7 +1,6 @@
 package dev.sebastiano.ricohsync.fakes
 
 import com.juul.kable.logs.LogEngine
-import com.juul.kable.logs.Logging
 
 /** Fake logging engine for testing. Logs to stdout. */
 object FakeLoggingEngine : LogEngine {

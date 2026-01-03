@@ -51,6 +51,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -82,11 +83,15 @@ fun PairingScreen(
     onDevicePaired: () -> Unit,
 ) {
     val state by viewModel.state
-
-    // Handle successful pairing
     val currentState = state
-    if (currentState is PairingScreenState.Pairing && currentState.success) {
-        onDevicePaired()
+
+    // Observe navigation events from ViewModel
+    LaunchedEffect(Unit) {
+        viewModel.navigationEvents.collect { event ->
+            when (event) {
+                is PairingNavigationEvent.DevicePaired -> onDevicePaired()
+            }
+        }
     }
 
     Scaffold(

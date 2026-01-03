@@ -9,6 +9,7 @@ import androidx.lifecycle.viewModelScope
 import com.juul.kable.ObsoleteKableApi
 import com.juul.kable.PlatformAdvertisement
 import com.juul.kable.Scanner
+import com.juul.kable.logs.LogEngine
 import com.juul.kable.logs.Logging
 import com.juul.kable.logs.SystemLogEngine
 import dev.sebastiano.ricohsync.RicohSyncApp
@@ -19,11 +20,14 @@ import kotlin.uuid.ExperimentalUuidApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.onStart
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 
 private const val TAG = "PairingViewModel"
@@ -35,10 +39,16 @@ private const val TAG = "PairingViewModel"
  * already-paired devices from the scan results.
  */
 @OptIn(ExperimentalUuidApi::class)
-class PairingViewModel(private val pairedDevicesRepository: PairedDevicesRepository) : ViewModel() {
+class PairingViewModel(
+    private val pairedDevicesRepository: PairedDevicesRepository,
+    private val loggingEngine: LogEngine = SystemLogEngine,
+) : ViewModel() {
 
     private val _state = mutableStateOf<PairingScreenState>(PairingScreenState.Idle)
     val state: State<PairingScreenState> = _state
+
+    private val _navigationEvents = Channel<PairingNavigationEvent>(Channel.BUFFERED)
+    val navigationEvents: Flow<PairingNavigationEvent> = _navigationEvents.receiveAsFlow()
 
     private var scanJob: Job? = null
     private var pairingJob: Job? = null
@@ -46,18 +56,24 @@ class PairingViewModel(private val pairedDevicesRepository: PairedDevicesReposit
     private val vendorRegistry: CameraVendorRegistry = RicohSyncApp.createVendorRegistry()
 
     @OptIn(ObsoleteKableApi::class)
-    private val scanner = Scanner {
-        // We don't use filters here because some cameras might not advertise
-        // the service UUID in the advertisement packet.
-        // We filter discovered devices in onDiscovery instead.
-        logging {
-            engine = SystemLogEngine
-            level = Logging.Level.Events
-            format = Logging.Format.Multiline
+    private val scanner: Scanner<PlatformAdvertisement>? =
+        try {
+            Scanner {
+                // We don't use filters here because some cameras might not advertise
+                // the service UUID in the advertisement packet.
+                // We filter discovered devices in onDiscovery instead.
+                logging {
+                    engine = loggingEngine
+                    level = Logging.Level.Events
+                    format = Logging.Format.Multiline
+                }
+                scanSettings =
+                    ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY).build()
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to create Scanner (may be in test environment)", e)
+            null
         }
-        scanSettings =
-            ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY).build()
-    }
 
     private val discoveredDevices = mutableMapOf<String, Camera>()
 
@@ -69,6 +85,10 @@ class PairingViewModel(private val pairedDevicesRepository: PairedDevicesReposit
     /** Starts scanning for cameras. */
     fun startScanning() {
         if (scanJob != null) return
+        if (scanner == null) {
+            // Scanner not available (e.g., in test environment)
+            return
+        }
 
         discoveredDevices.clear()
         _state.value = PairingScreenState.Scanning(emptyList())
@@ -127,7 +147,8 @@ class PairingViewModel(private val pairedDevicesRepository: PairedDevicesReposit
                     pairedDevicesRepository.addDevice(camera, enabled = true)
 
                     Log.i(TAG, "Device paired successfully: ${camera.name ?: camera.macAddress}")
-                    _state.value = PairingScreenState.Pairing(camera, success = true)
+                    // Emit navigation event instead of setting success flag in state
+                    _navigationEvents.send(PairingNavigationEvent.DevicePaired)
                 } catch (e: Exception) {
                     Log.e(TAG, "Pairing failed", e)
                     val error =
@@ -186,9 +207,11 @@ sealed interface PairingScreenState {
         PairingScreenState
 
     /** Pairing with a selected camera. */
-    data class Pairing(
-        val camera: Camera,
-        val error: PairingError? = null,
-        val success: Boolean = false,
-    ) : PairingScreenState
+    data class Pairing(val camera: Camera, val error: PairingError? = null) : PairingScreenState
+}
+
+/** Navigation events emitted by the PairingViewModel. */
+sealed interface PairingNavigationEvent {
+    /** Emitted when a device is successfully paired. */
+    data object DevicePaired : PairingNavigationEvent
 }

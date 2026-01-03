@@ -3,6 +3,7 @@ package dev.sebastiano.ricohsync.fakes
 import dev.sebastiano.ricohsync.domain.model.Camera
 import dev.sebastiano.ricohsync.domain.model.PairedDevice
 import dev.sebastiano.ricohsync.domain.repository.PairedDevicesRepository
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
@@ -42,7 +43,17 @@ class FakePairedDevicesRepository : PairedDevicesRepository {
     var lastRemovedMacAddress: String? = null
         private set
 
+    // Test control variables
+    var addDeviceException: Exception? = null
+    var addDeviceDelay: Long = 0L
+
     override suspend fun addDevice(camera: Camera, enabled: Boolean) {
+        if (addDeviceDelay > 0) {
+            delay(addDeviceDelay)
+        }
+
+        addDeviceException?.let { throw it }
+
         addDeviceCalled = true
         lastAddedCamera = camera
 
@@ -149,5 +160,7 @@ class FakePairedDevicesRepository : PairedDevicesRepository {
         setDeviceEnabledCalled = false
         lastAddedCamera = null
         lastRemovedMacAddress = null
+        addDeviceException = null
+        addDeviceDelay = 0L
     }
 }
