@@ -25,7 +25,19 @@ object SonyCameraVendor : CameraVendor {
 
     override fun recognizesDevice(deviceName: String?, serviceUuids: List<Uuid>): Boolean {
         // Sony cameras using DI Remote Control advertise a specific service UUID
-        return serviceUuids.any { uuid -> SonyGattSpec.scanFilterServiceUuids.contains(uuid) }
+        val hasSonyService =
+            serviceUuids.any { uuid -> SonyGattSpec.scanFilterServiceUuids.contains(uuid) }
+
+        // Additional check: device name typically starts with "ILCE-" for Alpha cameras
+        val hasSonyName =
+            deviceName?.let { name ->
+                SonyGattSpec.scanFilterDeviceNames.any { prefix ->
+                    name.startsWith(prefix, ignoreCase = true)
+                }
+            } ?: false
+
+        // Accept device if it has the Sony service UUID or a recognized name
+        return hasSonyService || hasSonyName
     }
 
     override fun getCapabilities(): CameraCapabilities {
@@ -36,5 +48,28 @@ object SonyCameraVendor : CameraVendor {
             supportsGeoTagging = false, // No separate toggle; location data includes time
             supportsLocationSync = true,
         )
+    }
+
+    override fun extractModelFromPairingName(pairingName: String?): String {
+        if (pairingName == null) return "Unknown"
+
+        val name = pairingName.trim()
+
+        // Sony cameras typically use ILCE- prefix for Alpha cameras
+        // Try to extract model from common patterns
+        val ilcePattern = Regex("ILCE-?([0-9A-Z]+)", RegexOption.IGNORE_CASE)
+        ilcePattern.find(name)?.let { match ->
+            return "ILCE-${match.groupValues[1]}"
+        }
+
+        // If name starts with known Sony prefixes, assume it's a model
+        if (
+            name.startsWith("ILCE", ignoreCase = true) || name.startsWith("DSC-", ignoreCase = true)
+        ) {
+            return name
+        }
+
+        // Fallback: return the pairing name as-is
+        return name
     }
 }

@@ -49,6 +49,9 @@ object SonyGattSpec : CameraGattSpec {
 
     override val scanFilterServiceUuids: List<Uuid> = listOf(REMOTE_CONTROL_SERVICE_UUID)
 
+    /** Device name prefixes for Sony Alpha cameras (ILCE = Interchangeable Lens Camera E-mount). */
+    override val scanFilterDeviceNames: List<String> = listOf("ILCE-")
+
     /** Standard Device Information Service. */
     override val firmwareServiceUuid: Uuid = Uuid.parse("0000180a-0000-1000-8000-00805f9b34fb")
     override val firmwareVersionCharacteristicUuid: Uuid =
