@@ -10,6 +10,8 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -33,7 +35,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LinkedCamera
 import androidx.compose.material.icons.filled.PhotoCamera
@@ -108,7 +109,6 @@ import org.maplibre.compose.map.MapOptions
 import org.maplibre.compose.map.MaplibreMap
 import org.maplibre.compose.map.OrnamentOptions
 import org.maplibre.compose.material3.CompassButton
-import org.maplibre.compose.material3.ExpandingAttributionButton
 import org.maplibre.compose.material3.LocationPuckDefaults
 import org.maplibre.compose.style.BaseStyle
 import org.maplibre.compose.style.rememberStyleState
@@ -125,12 +125,12 @@ fun DevicesListScreen(viewModel: DevicesListViewModel, onAddDeviceClick: () -> U
         modifier = Modifier.fillMaxSize(),
         topBar = {
             TopAppBar(
-                title = { 
+                title = {
                     Text(
                         "RicohSync",
                         style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.Bold
-                    ) 
+                        fontWeight = FontWeight.Bold,
+                    )
                 },
                 actions = {
                     val currentState = state
@@ -165,37 +165,45 @@ fun DevicesListScreen(viewModel: DevicesListViewModel, onAddDeviceClick: () -> U
             }
 
             is DevicesListState.HasDevices -> {
-                Column(
-                    modifier = Modifier.padding(innerPadding),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    if (currentState.isScanning) {
-                        LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-                    }
-
-                    LocationCard(
-                        location = currentState.currentLocation,
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-                    )
-
-                    if (!currentState.isSyncEnabled) {
-                        SyncStoppedWarning(
-                            onRefreshClick = { viewModel.refreshConnections() },
-                            enabled = currentState.devices.any { it.device.isEnabled },
+                Box(modifier = Modifier.padding(innerPadding)) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        LocationCard(
+                            location = currentState.currentLocation,
                             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                        )
+
+                        if (!currentState.isSyncEnabled) {
+                            SyncStoppedWarning(
+                                onRefreshClick = { viewModel.refreshConnections() },
+                                enabled = currentState.devices.any { it.device.isEnabled },
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                            )
+                        }
+
+                        DevicesList(
+                            devices = currentState.devices,
+                            onDeviceEnabledChange = { device, enabled ->
+                                viewModel.setDeviceEnabled(device.device.macAddress, enabled)
+                            },
+                            onUnpairClick = { device -> deviceToUnpair = device },
+                            onRetryClick = { device ->
+                                viewModel.retryConnection(device.device.macAddress)
+                            },
                         )
                     }
 
-                    DevicesList(
-                        devices = currentState.devices,
-                        onDeviceEnabledChange = { device, enabled ->
-                            viewModel.setDeviceEnabled(device.device.macAddress, enabled)
-                        },
-                        onUnpairClick = { device -> deviceToUnpair = device },
-                        onRetryClick = { device ->
-                            viewModel.retryConnection(device.device.macAddress)
-                        },
-                    )
+                    AnimatedVisibility(
+                        currentState.isScanning,
+                        enter = fadeIn(),
+                        exit = fadeOut(),
+                    ) {
+                        LinearProgressIndicator(
+                            modifier = Modifier.align(Alignment.TopCenter).fillMaxWidth()
+                        )
+                    }
                 }
             }
         }
@@ -300,9 +308,10 @@ private fun DeviceCard(
         modifier = Modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.medium,
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-        )
+        colors =
+            CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+            ),
     ) {
         Column {
             // Main row
