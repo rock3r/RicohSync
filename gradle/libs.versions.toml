@@ -17,11 +17,15 @@ lifecycleProcess = "2.10.0"
 maplibre = "0.12.1"
 maplibre-spatialk = "0.6.0"
 mockk = "1.14.7"
+navigation3 = "1.0.0"
 protobufPlugin = "0.9.6"
 protobuf = "4.33.2"
 playServicesLocation = "21.3.0"
 
 [libraries]
+androidx-navigation3-runtime = { group = "androidx.navigation3", name = "navigation3-runtime", version.ref = "navigation3" }
+androidx-navigation3-ui = { group = "androidx.navigation3", name = "navigation3-ui", version.ref = "navigation3" }
+androidx-lifecycle-viewmodel-navigation3 = { group = "androidx.lifecycle", name = "lifecycle-viewmodel-navigation3", version.ref = "navigation3" }
 accompanist-permissions = { module = "com.google.accompanist:accompanist-permissions", version.ref = "accompanist" }
 androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }
 androidx-compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "composeBom" }

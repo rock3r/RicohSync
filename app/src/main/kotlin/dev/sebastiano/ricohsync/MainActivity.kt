@@ -5,6 +5,11 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -15,11 +20,13 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.navigation3.ui.NavDisplay
+import androidx.navigation3.runtime.NavEntry
+import androidx.compose.runtime.mutableStateListOf
 import dev.sebastiano.ricohsync.data.repository.DataStorePairedDevicesRepository
 import dev.sebastiano.ricohsync.data.repository.FusedLocationRepository
 import dev.sebastiano.ricohsync.data.repository.pairedDevicesDataStoreV2
@@ -61,46 +68,76 @@ private fun RootComposable(
     context: Context,
 ) {
     RicohSyncTheme {
-        val state by viewModel.mainState
+        val backStack = remember { mutableStateListOf<NavRoute>(NavRoute.NeedsPermissions) }
 
-        when (state) {
-            MainState.NeedsPermissions -> {
-                PermissionsScreen(viewModel)
-            }
+        NavDisplay(
+            backStack = backStack,
+            onBack = { backStack.removeLastOrNull() },
+            transitionSpec = {
+                (slideInHorizontally(initialOffsetX = { it / 4 }) + fadeIn()) togetherWith
+                    (slideOutHorizontally(targetOffsetX = { -it / 4 }) + fadeOut())
+            },
+            popTransitionSpec = {
+                (slideInHorizontally(initialOffsetX = { -it / 4 }) + fadeIn()) togetherWith
+                    (slideOutHorizontally(targetOffsetX = { it / 4 }) + fadeOut())
+            },
+            predictivePopTransitionSpec = {
+                (slideInHorizontally(initialOffsetX = { -it / 4 }) + fadeIn()) togetherWith
+                    (slideOutHorizontally(targetOffsetX = { it / 4 }) + fadeOut())
+            },
+        ) { key ->
+            NavEntry(key) {
+                when (key) {
+                    NavRoute.NeedsPermissions -> {
+                        PermissionsScreen(
+                            onPermissionsGranted = {
+                                backStack.add(NavRoute.DevicesList)
+                                backStack.remove(NavRoute.NeedsPermissions)
+                            }
+                        )
+                    }
 
-            MainState.DevicesList -> {
-                val devicesListViewModel = remember {
-                    DevicesListViewModel(
-                        pairedDevicesRepository = pairedDevicesRepository,
-                        locationRepository = locationRepository,
-                        bindingContextProvider = { context.applicationContext },
-                    )
+                    NavRoute.DevicesList -> {
+                        val devicesListViewModel = remember {
+                            DevicesListViewModel(
+                                pairedDevicesRepository = pairedDevicesRepository,
+                                locationRepository = locationRepository,
+                                bindingContextProvider = { context.applicationContext },
+                            )
+                        }
+
+                        DevicesListScreen(
+                            viewModel = devicesListViewModel,
+                            onAddDeviceClick = {
+                                backStack.add(NavRoute.Pairing)
+                            },
+                        )
+                    }
+
+                    NavRoute.Pairing -> {
+                        val pairingViewModel = remember {
+                            PairingViewModel(pairedDevicesRepository = pairedDevicesRepository)
+                        }
+
+                        PairingScreen(
+                            viewModel = pairingViewModel,
+                            onNavigateBack = {
+                                if (backStack.isNotEmpty()) backStack.removeLast()
+                            },
+                            onDevicePaired = {
+                                if (backStack.isNotEmpty()) backStack.removeLast()
+                            },
+                        )
+                    }
                 }
-
-                DevicesListScreen(
-                    viewModel = devicesListViewModel,
-                    onAddDeviceClick = { viewModel.navigateToPairing() },
-                )
-            }
-
-            MainState.Pairing -> {
-                val pairingViewModel = remember {
-                    PairingViewModel(pairedDevicesRepository = pairedDevicesRepository)
-                }
-
-                PairingScreen(
-                    viewModel = pairingViewModel,
-                    onNavigateBack = { viewModel.navigateToDevicesList() },
-                    onDevicePaired = { viewModel.navigateToDevicesList() },
-                )
             }
         }
     }
 }
 
 @Composable
-private fun PermissionsScreen(mainViewModel: MainViewModel) {
-    PermissionsRequester(mainViewModel::onPermissionsGranted) { _, _, _, _, request ->
+private fun PermissionsScreen(onPermissionsGranted: () -> Unit) {
+    PermissionsRequester(onPermissionsGranted) { _, _, _, _, request ->
         Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
             Box(Modifier.fillMaxSize().padding(innerPadding), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
