@@ -13,9 +13,11 @@ import com.juul.khronicle.Log
 import dev.sebastiano.ricohsync.devicesync.MultiDeviceSyncService
 import dev.sebastiano.ricohsync.domain.model.DeviceConnectionState
 import dev.sebastiano.ricohsync.domain.model.GpsLocation
+import dev.sebastiano.ricohsync.domain.model.PairedDevice
 import dev.sebastiano.ricohsync.domain.model.PairedDeviceWithState
 import dev.sebastiano.ricohsync.domain.repository.LocationRepository
 import dev.sebastiano.ricohsync.domain.repository.PairedDevicesRepository
+import dev.sebastiano.ricohsync.domain.vendor.CameraVendorRegistry
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -35,6 +37,7 @@ class DevicesListViewModel(
     private val pairedDevicesRepository: PairedDevicesRepository,
     private val locationRepository: LocationRepository,
     private val bindingContextProvider: () -> Context,
+    private val vendorRegistry: CameraVendorRegistry,
 ) : ViewModel() {
 
     private val _state = mutableStateOf<DevicesListState>(DevicesListState.Loading)
@@ -66,18 +69,22 @@ class DevicesListViewModel(
                     if (pairedDevices.isEmpty()) {
                         DevicesListState.Empty
                     } else {
+                        val devicesWithState =
+                            pairedDevices.map { device ->
+                                val connectionState =
+                                    when {
+                                        !device.isEnabled -> DeviceConnectionState.Disabled
+                                        else ->
+                                            connectionStates[device.macAddress]
+                                                ?: DeviceConnectionState.Disconnected
+                                    }
+                                PairedDeviceWithState(device, connectionState)
+                            }
+                        val displayInfoMap =
+                            computeDeviceDisplayInfo(devicesWithState.map { it.device })
                         DevicesListState.HasDevices(
-                            devices =
-                                pairedDevices.map { device ->
-                                    val connectionState =
-                                        when {
-                                            !device.isEnabled -> DeviceConnectionState.Disabled
-                                            else ->
-                                                connectionStates[device.macAddress]
-                                                    ?: DeviceConnectionState.Disconnected
-                                        }
-                                    PairedDeviceWithState(device, connectionState)
-                                },
+                            devices = devicesWithState,
+                            displayInfoMap = displayInfoMap,
                             isScanning = isScanning,
                             isSyncEnabled = isSyncEnabled,
                             currentLocation = currentLocation,
@@ -186,6 +193,39 @@ class DevicesListViewModel(
         }
     }
 
+    /**
+     * Computes display information for all devices, determining make, model, and whether to show
+     * pairing name.
+     */
+    private fun computeDeviceDisplayInfo(
+        devices: List<PairedDevice>
+    ): Map<String, DeviceDisplayInfo> {
+        // Group devices by make/model to determine if we need to show pairing names
+        val makeModelGroups =
+            devices.groupBy { device ->
+                val vendor = vendorRegistry.getVendorById(device.vendorId)
+                val make = vendor?.vendorName ?: device.vendorId.replaceFirstChar { it.uppercase() }
+                val model = device.name ?: "Unknown"
+                MakeModel(make, model)
+            }
+
+        return devices.associate { device ->
+            val vendor = vendorRegistry.getVendorById(device.vendorId)
+            val make = vendor?.vendorName ?: device.vendorId.replaceFirstChar { it.uppercase() }
+            val model = device.name ?: "Unknown"
+            val makeModel = MakeModel(make, model)
+            val showPairingName = (makeModelGroups[makeModel]?.size ?: 0) > 1
+
+            device.macAddress to
+                DeviceDisplayInfo(
+                    make = make,
+                    model = model,
+                    pairingName = device.name,
+                    showPairingName = showPairingName,
+                )
+        }
+    }
+
     override fun onCleared() {
         super.onCleared()
         locationRepository.stopLocationUpdates()
@@ -201,6 +241,17 @@ class DevicesListViewModel(
     }
 }
 
+/** Display information for a device in the UI. */
+data class DeviceDisplayInfo(
+    val make: String,
+    val model: String,
+    val pairingName: String?,
+    val showPairingName: Boolean,
+)
+
+/** Internal helper to group devices by make and model. */
+private data class MakeModel(val make: String, val model: String)
+
 /** UI state for the devices list screen. */
 sealed interface DevicesListState {
     /** Loading devices from storage. */
@@ -212,6 +263,7 @@ sealed interface DevicesListState {
     /** Has one or more paired devices. */
     data class HasDevices(
         val devices: List<PairedDeviceWithState>,
+        val displayInfoMap: Map<String, DeviceDisplayInfo>,
         val isScanning: Boolean = false,
         val isSyncEnabled: Boolean = true,
         val currentLocation: GpsLocation? = null,

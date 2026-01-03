@@ -47,6 +47,7 @@ class MainActivity : ComponentActivity() {
 
         val pairedDevicesRepository = DataStorePairedDevicesRepository(pairedDevicesDataStoreV2)
         val locationRepository = FusedLocationRepository(applicationContext)
+        val vendorRegistry = RicohSyncApp.createVendorRegistry()
         val viewModel = MainViewModel(pairedDevicesRepository)
 
         setContent {
@@ -54,6 +55,7 @@ class MainActivity : ComponentActivity() {
                 viewModel = viewModel,
                 pairedDevicesRepository = pairedDevicesRepository,
                 locationRepository = locationRepository,
+                vendorRegistry = vendorRegistry,
                 context = this,
             )
         }
@@ -66,6 +68,7 @@ private fun RootComposable(
     viewModel: MainViewModel,
     pairedDevicesRepository: DataStorePairedDevicesRepository,
     locationRepository: LocationRepository,
+    vendorRegistry: dev.sebastiano.ricohsync.domain.vendor.CameraVendorRegistry,
     context: Context,
 ) {
     RicohSyncTheme {
@@ -124,6 +127,7 @@ private fun RootComposable(
                                 pairedDevicesRepository = pairedDevicesRepository,
                                 locationRepository = locationRepository,
                                 bindingContextProvider = { context.applicationContext },
+                                vendorRegistry = vendorRegistry,
                             )
                         }
 

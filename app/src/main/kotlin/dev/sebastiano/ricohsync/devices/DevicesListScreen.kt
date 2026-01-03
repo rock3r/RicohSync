@@ -90,7 +90,6 @@ import java.time.ZonedDateTime
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
-import kotlin.text.replaceFirstChar
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeMark
 import kotlin.time.TimeSource
@@ -185,6 +184,7 @@ fun DevicesListScreen(viewModel: DevicesListViewModel, onAddDeviceClick: () -> U
 
                         DevicesList(
                             devices = currentState.devices,
+                            displayInfoMap = currentState.displayInfoMap,
                             onDeviceEnabledChange = { device, enabled ->
                                 viewModel.setDeviceEnabled(device.device.macAddress, enabled)
                             },
@@ -266,6 +266,7 @@ private fun EmptyContent(modifier: Modifier = Modifier, onAddDeviceClick: () -> 
 @Composable
 private fun DevicesList(
     devices: List<PairedDeviceWithState>,
+    displayInfoMap: Map<String, DeviceDisplayInfo>,
     onDeviceEnabledChange: (PairedDeviceWithState, Boolean) -> Unit,
     onUnpairClick: (PairedDeviceWithState) -> Unit,
     onRetryClick: (PairedDeviceWithState) -> Unit,
@@ -283,8 +284,10 @@ private fun DevicesList(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         items(devices, key = { it.device.macAddress }) { deviceWithState ->
+            val displayInfo = displayInfoMap[deviceWithState.device.macAddress]
             DeviceCard(
                 deviceWithState = deviceWithState,
+                displayInfo = displayInfo,
                 onEnabledChange = { enabled -> onDeviceEnabledChange(deviceWithState, enabled) },
                 onUnpairClick = { onUnpairClick(deviceWithState) },
                 onRetryClick = { onRetryClick(deviceWithState) },
@@ -296,6 +299,7 @@ private fun DevicesList(
 @Composable
 private fun DeviceCard(
     deviceWithState: PairedDeviceWithState,
+    displayInfo: DeviceDisplayInfo?,
     onEnabledChange: (Boolean) -> Unit,
     onUnpairClick: () -> Unit,
     onRetryClick: () -> Unit,
@@ -303,6 +307,7 @@ private fun DeviceCard(
     var isExpanded by remember { mutableStateOf(false) }
     val device = deviceWithState.device
     val connectionState = deviceWithState.connectionState
+    val info = displayInfo ?: DeviceDisplayInfo("Unknown", "Unknown", device.name, false)
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -327,8 +332,15 @@ private fun DeviceCard(
 
                 // Device info
                 Column(modifier = Modifier.weight(1f)) {
+                    // Show make and model, with pairing name if needed
+                    val titleText =
+                        if (info.showPairingName && info.pairingName != null) {
+                            "${info.make} ${info.model} (${info.pairingName})"
+                        } else {
+                            "${info.make} ${info.model}"
+                        }
                     Text(
-                        text = device.name ?: "Unknown Camera",
+                        text = titleText,
                         style = MaterialTheme.typography.titleMedium,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -379,8 +391,12 @@ private fun DeviceCard(
                         Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 8.dp)
                 ) {
                     // Device details
+                    DeviceDetailRow("Make", info.make)
+                    DeviceDetailRow("Model", info.model)
+                    if (info.pairingName != null) {
+                        DeviceDetailRow("Pairing Name", info.pairingName)
+                    }
                     DeviceDetailRow("MAC Address", device.macAddress)
-                    DeviceDetailRow("Vendor", device.vendorId.replaceFirstChar { it.uppercase() })
 
                     if (device.lastSyncedAt != null) {
                         DeviceDetailRow("Last sync", formatElapsedTimeSince(device.lastSyncedAt))
