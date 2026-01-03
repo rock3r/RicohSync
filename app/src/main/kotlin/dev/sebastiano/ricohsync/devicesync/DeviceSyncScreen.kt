@@ -48,12 +48,12 @@ internal fun DeviceSyncScreen(viewModel: DeviceSyncViewModel) {
         modifier = Modifier.fillMaxSize(),
         topBar = {
             TopAppBar(
-                title = { 
+                title = {
                     Text(
                         "Syncing with camera",
                         style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold
-                    ) 
+                        fontWeight = FontWeight.Bold,
+                    )
                 },
                 actions = {
                     if (state is DeviceSyncState.Syncing) {
@@ -128,10 +128,10 @@ private fun Syncing(state: DeviceSyncState.Syncing) {
 
         val name = remember(state.camera) { state.camera.name ?: state.camera.identifier }
         Text(
-            "Syncing data to $name...", 
+            "Syncing data to $name...",
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.primary
+            color = MaterialTheme.colorScheme.primary,
         )
 
         if (state.firmwareVersion != null) {

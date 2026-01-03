@@ -7,9 +7,10 @@ import android.Manifest.permission.POST_NOTIFICATIONS
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
-import com.google.accompanist.permissions.PermissionState
 import com.google.accompanist.permissions.isGranted
-import com.google.accompanist.permissions.rememberPermissionState
+import com.google.accompanist.permissions.rememberMultiplePermissionsState
+
+data class PermissionInfo(val name: String, val description: String, val isGranted: Boolean)
 
 @OptIn(ExperimentalPermissionsApi::class)
 @Composable
@@ -17,69 +18,56 @@ fun PermissionsRequester(
     onPermissionsGranted: () -> Unit,
     content:
         @Composable
-        (
-            isLocationPermissionGranted: Boolean,
-            isBluetoothScanPermissionGranted: Boolean,
-            isBluetoothConnectPermissionGranted: Boolean,
-            isNotificationsPermissionGranted: Boolean,
-            onRequestPermissions: () -> Unit,
-        ) -> Unit,
+        (permissions: List<PermissionInfo>, onRequestAllPermissions: () -> Unit) -> Unit,
 ) {
-    val locationPermissionState = rememberPermissionState(permission = ACCESS_FINE_LOCATION) {}
-    val bluetoothScanPermissionState = rememberPermissionState(permission = BLUETOOTH_SCAN) {}
-    val bluetoothConnectPermissionState = rememberPermissionState(permission = BLUETOOTH_CONNECT) {}
-    val notificationsPermissionsState: PermissionState =
-        rememberPermissionState(permission = POST_NOTIFICATIONS) {}
+    val allPermissions =
+        listOf(ACCESS_FINE_LOCATION, BLUETOOTH_SCAN, BLUETOOTH_CONNECT, POST_NOTIFICATIONS)
 
-    LaunchedEffect(
-        locationPermissionState,
-        bluetoothScanPermissionState,
-        bluetoothConnectPermissionState,
-        notificationsPermissionsState,
-    ) {
-        if (
-            locationPermissionState.status.isGranted &&
-                bluetoothScanPermissionState.status.isGranted &&
-                bluetoothConnectPermissionState.status.isGranted &&
-                notificationsPermissionsState.status.isGranted
-        ) {
+    val multiplePermissionsState = rememberMultiplePermissionsState(permissions = allPermissions)
+
+    val permissionNames =
+        mapOf(
+            ACCESS_FINE_LOCATION to "Location",
+            BLUETOOTH_SCAN to "Bluetooth Scan",
+            BLUETOOTH_CONNECT to "Bluetooth Connect",
+            POST_NOTIFICATIONS to "Notifications",
+        )
+
+    val permissionDescriptions =
+        mapOf(
+            ACCESS_FINE_LOCATION to "Get GPS coordinates for your photos",
+            BLUETOOTH_SCAN to "Find nearby cameras",
+            BLUETOOTH_CONNECT to "Connect to your camera",
+            POST_NOTIFICATIONS to "Show sync status updates",
+        )
+
+    val permissions =
+        allPermissions.map { permission ->
+            val permissionState =
+                multiplePermissionsState.permissions.find { it.permission == permission }
+            PermissionInfo(
+                name = permissionNames[permission] ?: permission,
+                description = permissionDescriptions[permission] ?: "",
+                isGranted = permissionState?.status?.isGranted ?: false,
+            )
+        }
+
+    LaunchedEffect(multiplePermissionsState) {
+        if (multiplePermissionsState.allPermissionsGranted) {
             onPermissionsGranted()
         }
     }
 
     content(
-        /* isLocationPermissionGranted */ locationPermissionState.status.isGranted,
-        /* isBluetoothScanPermissionGranted */ bluetoothScanPermissionState.status.isGranted,
-        /* isBluetoothConnectPermissionGranted */ bluetoothConnectPermissionState.status.isGranted,
-        /* isNotificationsPermissionGranted */ notificationsPermissionsState.status.isGranted,
-    ) /* onRequestPermissions */ {
-        onRequestPermissions(
-            locationPermissionState,
-            bluetoothScanPermissionState,
-            bluetoothConnectPermissionState,
-            notificationsPermissionsState,
-            onPermissionsGranted,
-        )
-    }
-}
-
-@OptIn(ExperimentalPermissionsApi::class)
-private fun onRequestPermissions(
-    bluetoothScanPermissionState: PermissionState,
-    bluetoothConnectPermissionState: PermissionState,
-    locationPermissionState: PermissionState,
-    notificationsPermissionState: PermissionState,
-    onPermissionsGranted: () -> Unit,
-) {
-    when {
-        !locationPermissionState.status.isGranted ->
-            locationPermissionState.launchPermissionRequest()
-        !bluetoothScanPermissionState.status.isGranted ->
-            bluetoothScanPermissionState.launchPermissionRequest()
-        !bluetoothConnectPermissionState.status.isGranted ->
-            bluetoothConnectPermissionState.launchPermissionRequest()
-        !notificationsPermissionState.status.isGranted ->
-            notificationsPermissionState.launchPermissionRequest()
-        else -> onPermissionsGranted()
-    }
+        permissions,
+        {
+            val missingPermissions =
+                multiplePermissionsState.permissions
+                    .filter { !it.status.isGranted }
+                    .map { it.permission }
+            if (missingPermissions.isNotEmpty()) {
+                multiplePermissionsState.launchMultiplePermissionRequest()
+            }
+        },
+    )
 }

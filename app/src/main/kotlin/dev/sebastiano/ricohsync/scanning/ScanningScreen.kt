@@ -41,12 +41,12 @@ internal fun ScanningScreen(viewModel: ScanningViewModel, onDeviceSelected: (Cam
         modifier = Modifier.fillMaxSize(),
         topBar = {
             TopAppBar(
-                title = { 
+                title = {
                     Text(
                         if (isScanning) "Scanning..." else "Discovered cameras",
                         style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold
-                    ) 
+                        fontWeight = FontWeight.Bold,
+                    )
                 }
             )
         },
