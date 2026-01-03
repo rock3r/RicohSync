@@ -360,6 +360,264 @@ class MultiDeviceSyncCoordinatorTest {
             assertEquals(0, locationCollector.getRegisteredDeviceCount())
         }
 
+    @Test
+    fun `connection is established before initial setup to prevent GATT write errors`() =
+        testScope.runTest {
+            val connection = FakeCameraConnection(testDevice1.toTestCamera())
+            // Start with connection not established
+            connection.setConnected(false)
+            cameraRepository.connectionToReturn = connection
+
+            coordinator.startDeviceSync(testDevice1)
+
+            // Connection should be waiting for establishment
+            // After a short delay, establish the connection
+            advanceUntilIdle()
+            connection.setConnected(true)
+            advanceUntilIdle()
+
+            // Verify initial setup was performed after connection was established
+            assertTrue(connection.readFirmwareVersionCalled)
+            assertEquals("Test Device RicohSync", connection.pairedDeviceName)
+            assertTrue(
+                coordinator.getDeviceState(testDevice1.macAddress) is DeviceConnectionState.Syncing
+            )
+        }
+
+    @Test
+    fun `initial setup fails gracefully if connection closes during setup`() =
+        testScope.runTest {
+            val connection = FakeCameraConnection(testDevice1.toTestCamera())
+            connection.setConnected(true)
+            cameraRepository.connectionToReturn = connection
+
+            coordinator.startDeviceSync(testDevice1)
+            advanceUntilIdle()
+
+            // Connection should be established and setup started
+            assertTrue(connection.readFirmwareVersionCalled)
+
+            // Simulate connection closing during setup (before device name write)
+            connection.setConnected(false)
+            advanceUntilIdle()
+
+            // Should handle gracefully - state should reflect disconnection
+            assertFalse(coordinator.isDeviceConnected(testDevice1.macAddress))
+        }
+
+    @Test
+    fun `devices are disconnected when disabled via background monitoring`() =
+        testScope.runTest {
+            val connection = FakeCameraConnection(testDevice1.toTestCamera())
+            cameraRepository.connectionToReturn = connection
+
+            // Add device as enabled
+            pairedDevicesRepository.addTestDevice(testDevice1)
+            coordinator.startDeviceSync(testDevice1)
+            advanceUntilIdle()
+
+            assertTrue(coordinator.isDeviceConnected(testDevice1.macAddress))
+
+            // Start background monitoring
+            coordinator.startBackgroundMonitoring(pairedDevicesRepository.enabledDevices)
+            advanceUntilIdle()
+
+            // Disable the device
+            pairedDevicesRepository.setDeviceEnabled(testDevice1.macAddress, false)
+            advanceUntilIdle()
+
+            // Trigger background check
+            coordinator.refreshConnections()
+            advanceUntilIdle()
+
+            // Device should be disconnected
+            assertFalse(coordinator.isDeviceConnected(testDevice1.macAddress))
+            assertEquals(
+                DeviceConnectionState.Disconnected,
+                coordinator.getDeviceState(testDevice1.macAddress),
+            )
+            assertTrue(connection.disconnectCalled)
+        }
+
+    @Test
+    fun `checkAndConnectEnabledDevices disconnects devices no longer enabled`() =
+        testScope.runTest {
+            val connection1 = FakeCameraConnection(testDevice1.toTestCamera())
+            val connection2 = FakeCameraConnection(testDevice2.toTestCamera())
+
+            // Add both devices as enabled
+            pairedDevicesRepository.addTestDevice(testDevice1)
+            pairedDevicesRepository.addTestDevice(testDevice2)
+
+            cameraRepository.connectionToReturn = connection1
+            coordinator.startDeviceSync(testDevice1)
+            advanceUntilIdle()
+
+            cameraRepository.connectionToReturn = connection2
+            coordinator.startDeviceSync(testDevice2)
+            advanceUntilIdle()
+
+            assertTrue(coordinator.isDeviceConnected(testDevice1.macAddress))
+            assertTrue(coordinator.isDeviceConnected(testDevice2.macAddress))
+
+            // Start background monitoring
+            coordinator.startBackgroundMonitoring(pairedDevicesRepository.enabledDevices)
+            advanceUntilIdle()
+
+            // Disable device1
+            pairedDevicesRepository.setDeviceEnabled(testDevice1.macAddress, false)
+            advanceUntilIdle()
+
+            // Trigger check
+            coordinator.refreshConnections()
+            advanceUntilIdle()
+
+            // Device1 should be disconnected, device2 should remain connected
+            assertFalse(coordinator.isDeviceConnected(testDevice1.macAddress))
+            assertTrue(coordinator.isDeviceConnected(testDevice2.macAddress))
+            assertTrue(connection1.disconnectCalled)
+            assertFalse(connection2.disconnectCalled)
+        }
+
+    @Test
+    fun `connection check prevents write operations when connection is lost`() =
+        testScope.runTest {
+            val connection = FakeCameraConnection(testDevice1.toTestCamera())
+            connection.setConnected(true)
+            cameraRepository.connectionToReturn = connection
+
+            coordinator.startDeviceSync(testDevice1)
+            advanceUntilIdle()
+
+            // Connection should be established
+            assertTrue(coordinator.isDeviceConnected(testDevice1.macAddress))
+
+            // Simulate connection loss before a write operation
+            connection.setConnected(false)
+            advanceUntilIdle()
+
+            // State should reflect disconnection
+            assertFalse(coordinator.isDeviceConnected(testDevice1.macAddress))
+            assertEquals(
+                DeviceConnectionState.Disconnected,
+                coordinator.getDeviceState(testDevice1.macAddress),
+            )
+        }
+
+    @Test
+    fun `background monitoring connects newly enabled devices`() =
+        testScope.runTest {
+            val connection = FakeCameraConnection(testDevice1.toTestCamera())
+            cameraRepository.connectionToReturn = connection
+
+            // Add device as disabled
+            val disabledDevice = testDevice1.copy(isEnabled = false)
+            pairedDevicesRepository.addTestDevice(disabledDevice)
+
+            // Start background monitoring
+            coordinator.startBackgroundMonitoring(pairedDevicesRepository.enabledDevices)
+            advanceUntilIdle()
+
+            // Device should not be connected
+            assertFalse(coordinator.isDeviceConnected(testDevice1.macAddress))
+
+            // Enable the device
+            pairedDevicesRepository.setDeviceEnabled(testDevice1.macAddress, true)
+            advanceUntilIdle()
+
+            // Trigger check
+            coordinator.refreshConnections()
+            advanceUntilIdle()
+
+            // Device should now be connected
+            assertTrue(coordinator.isDeviceConnected(testDevice1.macAddress))
+        }
+
+    @Test
+    fun `device state updates when device is disabled via background monitoring`() =
+        testScope.runTest {
+            val connection1 = FakeCameraConnection(testDevice1.toTestCamera())
+            val connection2 = FakeCameraConnection(testDevice2.toTestCamera())
+
+            // Add both devices as enabled
+            pairedDevicesRepository.addTestDevice(testDevice1)
+            pairedDevicesRepository.addTestDevice(testDevice2)
+
+            cameraRepository.connectionToReturn = connection1
+            coordinator.startDeviceSync(testDevice1)
+            advanceUntilIdle()
+
+            cameraRepository.connectionToReturn = connection2
+            coordinator.startDeviceSync(testDevice2)
+            advanceUntilIdle()
+
+            // Both should be connected
+            assertEquals(2, coordinator.getConnectedDeviceCount())
+            assertTrue(coordinator.isDeviceConnected(testDevice1.macAddress))
+            assertTrue(coordinator.isDeviceConnected(testDevice2.macAddress))
+
+            // Start background monitoring
+            coordinator.startBackgroundMonitoring(pairedDevicesRepository.enabledDevices)
+            advanceUntilIdle()
+
+            // Disable device1
+            pairedDevicesRepository.setDeviceEnabled(testDevice1.macAddress, false)
+            advanceUntilIdle()
+
+            // Trigger check - this should disconnect device1
+            coordinator.refreshConnections()
+            advanceUntilIdle()
+
+            // Device1 should be disconnected, device2 should remain connected
+            assertEquals(1, coordinator.getConnectedDeviceCount())
+            assertFalse(coordinator.isDeviceConnected(testDevice1.macAddress))
+            assertTrue(coordinator.isDeviceConnected(testDevice2.macAddress))
+
+            // Device1 state should be Disconnected
+            assertEquals(
+                DeviceConnectionState.Disconnected,
+                coordinator.getDeviceState(testDevice1.macAddress),
+            )
+        }
+
+    @Test
+    fun `device state reflects enabled count changes for notification updates`() =
+        testScope.runTest {
+            val connection1 = FakeCameraConnection(testDevice1.toTestCamera())
+            val connection2 = FakeCameraConnection(testDevice2.toTestCamera())
+
+            // Add both devices as enabled
+            pairedDevicesRepository.addTestDevice(testDevice1)
+            pairedDevicesRepository.addTestDevice(testDevice2)
+
+            // Start background monitoring to track enabled devices
+            coordinator.startBackgroundMonitoring(pairedDevicesRepository.enabledDevices)
+            advanceUntilIdle()
+
+            // Initially both enabled, but not connected
+            assertEquals(0, coordinator.getConnectedDeviceCount())
+
+            // Connect device1
+            cameraRepository.connectionToReturn = connection1
+            coordinator.startDeviceSync(testDevice1)
+            advanceUntilIdle()
+
+            // Should have 1 connected, 2 enabled
+            assertEquals(1, coordinator.getConnectedDeviceCount())
+
+            // Disable device2 - this should be reflected in enabled devices flow
+            pairedDevicesRepository.setDeviceEnabled(testDevice2.macAddress, false)
+            advanceUntilIdle()
+
+            // Trigger check to process the change
+            coordinator.refreshConnections()
+            advanceUntilIdle()
+
+            // Should still have 1 connected, but now only 1 enabled
+            assertEquals(1, coordinator.getConnectedDeviceCount())
+            assertTrue(coordinator.isDeviceConnected(testDevice1.macAddress))
+        }
+
     private fun PairedDevice.toTestCamera() =
         dev.sebastiano.ricohsync.domain.model.Camera(
             identifier = macAddress,

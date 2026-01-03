@@ -134,7 +134,22 @@ suspend fun stopDeviceSync(macAddress: String)
 suspend fun stopAllDevices()
 fun isDeviceConnected(macAddress: String): Boolean
 fun getConnectedDeviceCount(): Int
+fun startBackgroundMonitoring(enabledDevices: Flow<List<PairedDevice>>)
+fun refreshConnections()
 ```
+
+**Connection Lifecycle:**
+1. `startDeviceSync()` establishes the BLE connection
+2. **Waits for connection to be fully established** before performing initial setup (prevents GATT write errors)
+3. Performs initial setup (firmware read, device name, date/time, geo-tagging) with connection state checks
+4. Registers device for location updates
+5. Monitors connection state and cleans up on disconnection
+
+**Background Monitoring:**
+- `startBackgroundMonitoring()` observes the enabled devices flow
+- Periodically checks for enabled but disconnected devices and connects them
+- **Automatically disconnects devices that are no longer enabled**
+- Runs every 60 seconds and on enabled devices flow changes
 
 **Connection States:**
 ```kotlin
@@ -255,11 +270,14 @@ PairedDevicesRepository.setDeviceEnabled(mac, enabled)
 If (enabled AND sync_enabled) -> context.startService()
         │
         ▼
-MultiDeviceSyncService observes change
+MultiDeviceSyncService observes change via background monitoring
         │
         ├── If enabled: startDeviceSync(device)
-        └── If disabled: stopDeviceSync(mac)
+        └── If disabled: checkAndConnectEnabledDevices() detects
+            device is no longer enabled and calls stopDeviceSync(mac)
 ```
+
+**Important:** When a device is disabled, the `checkAndConnectEnabledDevices()` method automatically detects connected devices that are no longer in the enabled list and disconnects them. This ensures devices are properly disconnected when disabled, preventing them from remaining connected.
 
 ## Testing
 
@@ -326,6 +344,16 @@ When a device fails to connect:
 2. Error message indicates cause (pairing rejected, timeout, etc.)
 3. Recoverable errors can be retried via `retryDeviceConnection()`
 4. Error state is preserved (not overwritten by cleanup)
+
+### GATT Write Errors
+
+To prevent `ProfileServiceNotBound` and other GATT write errors:
+1. **Connection establishment is verified** before performing initial setup operations
+2. Connection state is checked before each write operation (device name, date/time, geo-tagging)
+3. If connection is lost during setup, operations fail gracefully with warnings logged
+4. The coordinator waits for `connection.isConnected` to emit `true` before calling `performInitialSetup()`
+
+This ensures that BLE operations only occur when the connection is fully established and active.
 
 ### Pairing Errors
 

@@ -129,6 +129,30 @@ class MultiDeviceSyncCoordinator(
         try {
             scanMutex.withLock {
                 val enabledDevices = enabledDevicesFlow.value
+                val enabledMacAddresses = enabledDevices.map { it.macAddress }.toSet()
+
+                // First, disconnect any devices that are connected but no longer enabled
+                jobsMutex.withLock {
+                    val connectedDevices = deviceConnections.keys.toList()
+                    connectedDevices.forEach { macAddress ->
+                        if (!enabledMacAddresses.contains(macAddress)) {
+                            val state = getDeviceState(macAddress)
+                            if (
+                                state is DeviceConnectionState.Connected ||
+                                    state is DeviceConnectionState.Syncing ||
+                                    state is DeviceConnectionState.Connecting ||
+                                    state is DeviceConnectionState.Searching
+                            ) {
+                                Log.info(tag = TAG) {
+                                    "Device $macAddress is connected but no longer enabled, disconnecting..."
+                                }
+                                stopDeviceSync(macAddress)
+                            }
+                        }
+                    }
+                }
+
+                // Then, connect devices that are enabled but not connected
                 enabledDevices.forEach { device ->
                     val macAddress = device.macAddress
                     val state = getDeviceState(macAddress)
@@ -211,6 +235,12 @@ class MultiDeviceSyncCoordinator(
 
                         jobsMutex.withLock { deviceConnections[macAddress] = connection }
 
+                        // Wait until the connection is fully established before performing setup
+                        connection.isConnected.filter { it }.first()
+                        Log.info(tag = TAG) {
+                            "Device $macAddress connection established, performing initial setup..."
+                        }
+
                         val firmwareVersion = performInitialSetup(connection)
 
                         updateDeviceState(
@@ -220,10 +250,6 @@ class MultiDeviceSyncCoordinator(
 
                         // Start the global location sync if not already running
                         ensureLocationSyncRunning()
-
-                        // Wait until the connection is fully established
-                        connection.isConnected.filter { it }.first()
-                        Log.info(tag = TAG) { "Device $macAddress successfully connected" }
 
                         // Wait until the connection is lost or the job is cancelled
                         connection.isConnected.filter { !it }.first()
@@ -270,10 +296,18 @@ class MultiDeviceSyncCoordinator(
     private suspend fun performInitialSetup(connection: CameraConnection): String {
         val capabilities = connection.camera.vendor.getCapabilities()
 
+        // Verify connection is still active before proceeding
+        if (!connection.isConnected.first()) {
+            throw IllegalStateException("Connection lost before initial setup")
+        }
+
         // Read firmware version if supported
         val firmwareVersion =
             if (capabilities.supportsFirmwareVersion) {
                 try {
+                    if (!connection.isConnected.first()) {
+                        throw IllegalStateException("Connection lost during firmware read")
+                    }
                     connection.readFirmwareVersion()
                 } catch (e: Exception) {
                     Log.warn(tag = TAG, throwable = e) { "Failed to read firmware version" }
@@ -284,6 +318,9 @@ class MultiDeviceSyncCoordinator(
         // Set paired device name if supported
         if (capabilities.supportsDeviceName) {
             try {
+                if (!connection.isConnected.first()) {
+                    throw IllegalStateException("Connection lost before setting device name")
+                }
                 connection.setPairedDeviceName(deviceNameProvider())
             } catch (e: Exception) {
                 Log.warn(tag = TAG, throwable = e) { "Failed to set paired device name" }
@@ -293,6 +330,9 @@ class MultiDeviceSyncCoordinator(
         // Sync date/time if supported
         if (capabilities.supportsDateTimeSync) {
             try {
+                if (!connection.isConnected.first()) {
+                    throw IllegalStateException("Connection lost before date/time sync")
+                }
                 connection.syncDateTime(ZonedDateTime.now())
             } catch (e: Exception) {
                 Log.warn(tag = TAG, throwable = e) { "Failed to sync date/time" }
@@ -302,6 +342,9 @@ class MultiDeviceSyncCoordinator(
         // Enable geo-tagging if supported
         if (capabilities.supportsGeoTagging) {
             try {
+                if (!connection.isConnected.first()) {
+                    throw IllegalStateException("Connection lost before enabling geo-tagging")
+                }
                 connection.setGeoTaggingEnabled(true)
             } catch (e: Exception) {
                 Log.warn(tag = TAG, throwable = e) { "Failed to enable geo-tagging" }

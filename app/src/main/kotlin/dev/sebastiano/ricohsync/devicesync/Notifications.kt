@@ -172,17 +172,33 @@ internal fun createMultiDeviceNotification(
 ): Notification {
     val title =
         when {
-            connectedCount == 0 && totalEnabled == 0 -> "No devices enabled"
+            totalEnabled == 0 -> "No devices enabled"
             connectedCount == 0 ->
                 "Searching for $totalEnabled device${if (totalEnabled > 1) "s" else ""}..."
-            connectedCount == 1 -> "Syncing with 1 device"
-            else -> "Syncing with $connectedCount devices"
+            connectedCount == totalEnabled -> {
+                if (connectedCount == 1) {
+                    "Syncing with 1 device"
+                } else {
+                    "Syncing with $connectedCount devices"
+                }
+            }
+            else -> "Syncing with $connectedCount of $totalEnabled devices"
         }
 
     val content =
         when {
-            connectedCount == 0 && totalEnabled == 0 -> "Enable devices to start syncing"
+            totalEnabled == 0 -> "Enable devices to start syncing"
             connectedCount == 0 -> "Will connect when cameras are in range"
+            connectedCount < totalEnabled -> {
+                val missing = totalEnabled - connectedCount
+                val syncText =
+                    if (lastSyncTime != null) {
+                        "Last sync: ${formatElapsedTimeSince(lastSyncTime)}"
+                    } else {
+                        "Connected and syncing"
+                    }
+                "$syncText • $missing waiting"
+            }
             lastSyncTime != null -> "Last sync: ${formatElapsedTimeSince(lastSyncTime)}"
             else -> "Connected and syncing"
         }
