@@ -1,6 +1,6 @@
 package dev.sebastiano.ricohsync.devicesync
 
-import android.util.Log
+import com.juul.khronicle.Log
 import dev.sebastiano.ricohsync.domain.model.GpsLocation
 import dev.sebastiano.ricohsync.domain.repository.LocationRepository
 import java.util.concurrent.ConcurrentHashMap
@@ -38,11 +38,11 @@ class DefaultLocationCollector(
 
     override fun startCollecting() {
         if (collectionJob != null) {
-            Log.d(TAG, "Location collection already active")
+            Log.debug(tag = TAG) { "Location collection already active" }
             return
         }
 
-        Log.i(TAG, "Starting location collection")
+        Log.info(tag = TAG) { "Starting location collection" }
         _isCollecting.value = true
         locationRepository.startLocationUpdates()
 
@@ -51,14 +51,16 @@ class DefaultLocationCollector(
                 locationRepository.locationUpdates.collect { location ->
                     _locationUpdates.value = location
                     if (location != null) {
-                        Log.d(TAG, "New location: ${location.latitude}, ${location.longitude}")
+                        Log.debug(tag = TAG) {
+                            "New location: ${location.latitude}, ${location.longitude}"
+                        }
                     }
                 }
             }
     }
 
     override fun stopCollecting() {
-        Log.i(TAG, "Stopping location collection")
+        Log.info(tag = TAG) { "Stopping location collection" }
         collectionJob?.cancel()
         collectionJob = null
         locationRepository.stopLocationUpdates()
@@ -68,7 +70,7 @@ class DefaultLocationCollector(
     override fun registerDevice(deviceId: String) {
         val wasEmpty = registeredDevices.isEmpty()
         registeredDevices.add(deviceId)
-        Log.i(TAG, "Device registered: $deviceId (total: ${registeredDevices.size})")
+        Log.info(tag = TAG) { "Device registered: $deviceId (total: ${registeredDevices.size})" }
 
         if (wasEmpty) {
             startCollecting()
@@ -77,7 +79,7 @@ class DefaultLocationCollector(
 
     override fun unregisterDevice(deviceId: String) {
         registeredDevices.remove(deviceId)
-        Log.i(TAG, "Device unregistered: $deviceId (total: ${registeredDevices.size})")
+        Log.info(tag = TAG) { "Device unregistered: $deviceId (total: ${registeredDevices.size})" }
 
         if (registeredDevices.isEmpty()) {
             stopCollecting()

@@ -1,7 +1,6 @@
 package dev.sebastiano.ricohsync.data.repository
 
 import android.bluetooth.le.ScanSettings
-import android.util.Log
 import com.juul.kable.Advertisement
 import com.juul.kable.ExperimentalApi
 import com.juul.kable.ObsoleteKableApi
@@ -9,12 +8,13 @@ import com.juul.kable.Peripheral
 import com.juul.kable.State
 import com.juul.kable.WriteType
 import com.juul.kable.logs.Logging
-import com.juul.kable.logs.SystemLogEngine
+import com.juul.khronicle.Log
 import dev.sebastiano.ricohsync.domain.model.Camera
 import dev.sebastiano.ricohsync.domain.model.GpsLocation
 import dev.sebastiano.ricohsync.domain.repository.CameraConnection
 import dev.sebastiano.ricohsync.domain.repository.CameraRepository
 import dev.sebastiano.ricohsync.domain.vendor.CameraVendorRegistry
+import dev.sebastiano.ricohsync.logging.KhronicleLogEngine
 import java.time.ZonedDateTime
 import kotlin.uuid.ExperimentalUuidApi
 import kotlinx.coroutines.flow.Flow
@@ -36,15 +36,17 @@ class KableCameraRepository(private val vendorRegistry: CameraVendorRegistry) : 
     @OptIn(ObsoleteKableApi::class)
     private val scanner by lazy {
         val scanFilterUuids = vendorRegistry.getAllScanFilterUuids()
-        Log.i(TAG, "Scanning for cameras from ${vendorRegistry.getAllVendors().size} vendors")
-        Log.i(TAG, "Scan filter UUIDs: $scanFilterUuids")
+        Log.info(tag = TAG) {
+            "Scanning for cameras from ${vendorRegistry.getAllVendors().size} vendors"
+        }
+        Log.info(tag = TAG) { "Scan filter UUIDs: $scanFilterUuids" }
 
         com.juul.kable.Scanner {
             // We don't use filters here because some cameras might not advertise
             // the service UUID in the advertisement packet.
             // We filter discovered devices in discoveredCameras instead.
             logging {
-                engine = SystemLogEngine
+                engine = KhronicleLogEngine
                 level = Logging.Level.Events
                 format = Logging.Format.Multiline
             }
@@ -58,11 +60,11 @@ class KableCameraRepository(private val vendorRegistry: CameraVendorRegistry) : 
 
     override fun startScanning() {
         // Scanner is lazy and starts when advertisements flow is collected
-        Log.i(TAG, "Starting camera scan")
+        Log.info(tag = TAG) { "Starting camera scan" }
     }
 
     override fun stopScanning() {
-        Log.i(TAG, "Stopping camera scan")
+        Log.info(tag = TAG) { "Stopping camera scan" }
         // Scanner stops when the flow collection is cancelled
     }
 
@@ -72,7 +74,7 @@ class KableCameraRepository(private val vendorRegistry: CameraVendorRegistry) : 
             com.juul.kable.Scanner {
                 filters { match { address = macAddress } }
                 logging {
-                    engine = SystemLogEngine
+                    engine = KhronicleLogEngine
                     level = Logging.Level.Events
                 }
             }
@@ -94,14 +96,14 @@ class KableCameraRepository(private val vendorRegistry: CameraVendorRegistry) : 
             Peripheral(advertisement) {
                 logging {
                     level = Logging.Level.Events
-                    engine = SystemLogEngine
+                    engine = KhronicleLogEngine
                     identifier = "CameraSync:${camera.vendor.vendorName}"
                 }
             }
 
-        Log.i(TAG, "Connecting to ${camera.name}...")
+        Log.info(tag = TAG) { "Connecting to ${camera.name}..." }
         peripheral.connect()
-        Log.i(TAG, "Connected to ${camera.name}")
+        Log.info(tag = TAG) { "Connected to ${camera.name}" }
 
         return KableCameraConnection(camera, peripheral)
     }
@@ -116,11 +118,13 @@ class KableCameraRepository(private val vendorRegistry: CameraVendorRegistry) : 
             vendorRegistry.identifyVendor(deviceName = peripheralName, serviceUuids = uuids)
 
         if (vendor == null) {
-            Log.w(TAG, "No vendor recognized for device: $peripheralName (services: $uuids)")
+            Log.warn(tag = TAG) {
+                "No vendor recognized for device: $peripheralName (services: $uuids)"
+            }
             return null
         }
 
-        Log.i(TAG, "Discovered ${vendor.vendorName} camera: $peripheralName")
+        Log.info(tag = TAG) { "Discovered ${vendor.vendorName} camera: $peripheralName" }
         return Camera(
             identifier = identifier,
             name = peripheralName,
@@ -166,7 +170,7 @@ internal class KableCameraConnection(
 
         val firmwareBytes = peripheral.read(char)
         val version = firmwareBytes.decodeToString().trimEnd(Char(0))
-        Log.i(TAG, "Firmware version: $version")
+        Log.info(tag = TAG) { "Firmware version: $version" }
         return version
     }
 
@@ -186,7 +190,7 @@ internal class KableCameraConnection(
                 it.characteristicUuid == gattSpec.deviceNameCharacteristicUuid
             }
 
-        Log.i(TAG, "Setting paired device name: $name")
+        Log.info(tag = TAG) { "Setting paired device name: $name" }
         peripheral.write(
             characteristic = char,
             data = name.encodeToByteArray(),
@@ -211,7 +215,7 @@ internal class KableCameraConnection(
             }
 
         val data = protocol.encodeDateTime(dateTime)
-        Log.i(TAG, "Syncing date/time: ${protocol.decodeDateTime(data)}")
+        Log.info(tag = TAG) { "Syncing date/time: ${protocol.decodeDateTime(data)}" }
         peripheral.write(char, data, WriteType.WithResponse)
     }
 
@@ -232,7 +236,7 @@ internal class KableCameraConnection(
             }
 
         val data = peripheral.read(char)
-        Log.i(TAG, "Read camera date/time: ${protocol.decodeDateTime(data)}")
+        Log.info(tag = TAG) { "Read camera date/time: ${protocol.decodeDateTime(data)}" }
         return data
     }
 
@@ -254,11 +258,13 @@ internal class KableCameraConnection(
 
         val currentlyEnabled = isGeoTaggingEnabled()
         if (currentlyEnabled == enabled) {
-            Log.i(TAG, "Geo-tagging already ${if (enabled) "enabled" else "disabled"}, skipping")
+            Log.info(tag = TAG) {
+                "Geo-tagging already ${if (enabled) "enabled" else "disabled"}, skipping"
+            }
             return
         }
 
-        Log.i(TAG, "${if (enabled) "Enabling" else "Disabling"} geo-tagging")
+        Log.info(tag = TAG) { "${if (enabled) "Enabling" else "Disabling"} geo-tagging" }
         peripheral.write(
             characteristic = char,
             data = protocol.encodeGeoTaggingEnabled(enabled),
@@ -284,7 +290,7 @@ internal class KableCameraConnection(
 
         val data = peripheral.read(char)
         val enabled = protocol.decodeGeoTaggingEnabled(data)
-        Log.i(TAG, "Geo-tagging is ${if (enabled) "enabled" else "disabled"}")
+        Log.info(tag = TAG) { "Geo-tagging is ${if (enabled) "enabled" else "disabled"}" }
         return enabled
     }
 
@@ -305,13 +311,13 @@ internal class KableCameraConnection(
             }
 
         val data = protocol.encodeLocation(location)
-        Log.i(TAG, "Syncing location: ${protocol.decodeLocation(data)}")
+        Log.info(tag = TAG) { "Syncing location: ${protocol.decodeLocation(data)}" }
         peripheral.write(char, data, WriteType.WithResponse)
     }
 
     @OptIn(ExperimentalApi::class)
     override suspend fun disconnect() {
-        Log.i(TAG, "Disconnecting from ${camera.name}")
+        Log.info(tag = TAG) { "Disconnecting from ${camera.name}" }
         peripheral.disconnect()
     }
 

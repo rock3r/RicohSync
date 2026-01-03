@@ -5,7 +5,7 @@ import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
-import android.util.Log
+import com.juul.khronicle.Log
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 
@@ -43,16 +43,16 @@ class SyncErrorVibrator(private val context: Context) {
         val lastTime = lastVibrationTime
 
         if (lastTime != null && ChronoUnit.MINUTES.between(lastTime, now) < 5) {
-            Log.d(TAG, "Skipping vibration, last one was less than 5 minutes ago")
+            Log.debug(tag = TAG) { "Skipping vibration, last one was less than 5 minutes ago" }
             return
         }
 
         if (!vibrator.hasVibrator()) {
-            Log.w(TAG, "Device does not have a vibrator")
+            Log.warn(tag = TAG) { "Device does not have a vibrator" }
             return
         }
 
-        Log.i(TAG, "Starting aggressive vibration for sync error")
+        Log.info(tag = TAG) { "Starting aggressive vibration for sync error" }
         lastVibrationTime = now
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -66,7 +66,7 @@ class SyncErrorVibrator(private val context: Context) {
 
     /** Stops any ongoing vibration. */
     fun stop() {
-        Log.d(TAG, "Stopping vibration")
+        Log.debug(tag = TAG) { "Stopping vibration" }
         vibrator.cancel()
     }
 

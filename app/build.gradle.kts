@@ -57,6 +57,7 @@ dependencies {
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.kable)
+    implementation(libs.khronicle.core)
     implementation(libs.play.services.location)
     implementation(libs.maplibre.core)
     implementation(libs.maplibre.material3)

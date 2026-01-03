@@ -28,4 +28,3 @@ object FakeLoggingEngine : LogEngine {
         println("[$tag] ASSERT: $message${if(throwable != null) ", $throwable" else ""}")
     }
 }
-

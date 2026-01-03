@@ -1,7 +1,6 @@
 package dev.sebastiano.ricohsync.pairing
 
 import android.bluetooth.le.ScanSettings
-import android.util.Log
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
@@ -11,11 +10,12 @@ import com.juul.kable.PlatformAdvertisement
 import com.juul.kable.Scanner
 import com.juul.kable.logs.LogEngine
 import com.juul.kable.logs.Logging
-import com.juul.kable.logs.SystemLogEngine
+import com.juul.khronicle.Log
 import dev.sebastiano.ricohsync.RicohSyncApp
 import dev.sebastiano.ricohsync.domain.model.Camera
 import dev.sebastiano.ricohsync.domain.repository.PairedDevicesRepository
 import dev.sebastiano.ricohsync.domain.vendor.CameraVendorRegistry
+import dev.sebastiano.ricohsync.logging.KhronicleLogEngine
 import kotlin.uuid.ExperimentalUuidApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -41,7 +41,7 @@ private const val TAG = "PairingViewModel"
 @OptIn(ExperimentalUuidApi::class)
 class PairingViewModel(
     private val pairedDevicesRepository: PairedDevicesRepository,
-    private val loggingEngine: LogEngine = SystemLogEngine,
+    private val loggingEngine: LogEngine = KhronicleLogEngine,
 ) : ViewModel() {
 
     private val _state = mutableStateOf<PairingScreenState>(PairingScreenState.Idle)
@@ -71,7 +71,9 @@ class PairingViewModel(
                     ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY).build()
             }
         } catch (e: Exception) {
-            Log.w(TAG, "Failed to create Scanner (may be in test environment)", e)
+            Log.warn(tag = TAG, throwable = e) {
+                "Failed to create Scanner (may be in test environment)"
+            }
             null
         }
 
@@ -96,8 +98,8 @@ class PairingViewModel(
         scanJob =
             scanner.advertisements
                 .onEach { advertisement -> onDiscovery(advertisement) }
-                .onStart { Log.i(TAG, "BLE scan started") }
-                .onCompletion { Log.i(TAG, "BLE scan completed") }
+                .onStart { Log.info(tag = TAG) { "BLE scan started" } }
+                .onCompletion { Log.info(tag = TAG) { "BLE scan completed" } }
                 .flowOn(Dispatchers.IO)
                 .launchIn(viewModelScope)
     }
@@ -118,7 +120,7 @@ class PairingViewModel(
 
         // Check if already paired
         if (pairedDevicesRepository.isDevicePaired(camera.macAddress)) {
-            Log.d(TAG, "Device ${camera.macAddress} already paired, skipping")
+            Log.debug(tag = TAG) { "Device ${camera.macAddress} already paired, skipping" }
             return
         }
 
@@ -146,11 +148,13 @@ class PairingViewModel(
                     // The actual BLE connection will happen when the device is enabled
                     pairedDevicesRepository.addDevice(camera, enabled = true)
 
-                    Log.i(TAG, "Device paired successfully: ${camera.name ?: camera.macAddress}")
+                    Log.info(tag = TAG) {
+                        "Device paired successfully: ${camera.name ?: camera.macAddress}"
+                    }
                     // Emit navigation event instead of setting success flag in state
                     _navigationEvents.send(PairingNavigationEvent.DevicePaired)
                 } catch (e: Exception) {
-                    Log.e(TAG, "Pairing failed", e)
+                    Log.error(tag = TAG, throwable = e) { "Pairing failed" }
                     val error =
                         when {
                             e.message?.contains("reject", ignoreCase = true) == true ->
@@ -177,11 +181,11 @@ class PairingViewModel(
             vendorRegistry.identifyVendor(deviceName = peripheralName ?: name, serviceUuids = uuids)
 
         if (vendor == null) {
-            Log.w(TAG, "No vendor recognized for device: ${peripheralName ?: name}")
+            Log.warn(tag = TAG) { "No vendor recognized for device: ${peripheralName ?: name}" }
             return null
         }
 
-        Log.i(TAG, "Discovered ${vendor.vendorName} camera: ${peripheralName ?: name}")
+        Log.info(tag = TAG) { "Discovered ${vendor.vendorName} camera: ${peripheralName ?: name}" }
         return Camera(
             identifier = identifier,
             name = peripheralName ?: name,

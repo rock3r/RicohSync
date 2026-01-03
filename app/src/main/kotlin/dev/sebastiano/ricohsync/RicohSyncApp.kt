@@ -1,5 +1,8 @@
 package dev.sebastiano.ricohsync
 
+import com.juul.khronicle.ConsoleLogger
+import com.juul.khronicle.Log
+import com.juul.khronicle.Logger
 import dev.sebastiano.ricohsync.domain.vendor.CameraVendorRegistry
 import dev.sebastiano.ricohsync.domain.vendor.DefaultCameraVendorRegistry
 import dev.sebastiano.ricohsync.vendors.ricoh.RicohCameraVendor
@@ -7,6 +10,15 @@ import dev.sebastiano.ricohsync.vendors.sony.SonyCameraVendor
 
 /** Application-level configuration and dependency creation for RicohSync. */
 object RicohSyncApp {
+
+    /**
+     * Initializes Khronicle logging with the provided logger.
+     *
+     * @param logger The logger to use. Defaults to ConsoleLogger for production.
+     */
+    fun initializeLogging(logger: Logger = ConsoleLogger) {
+        Log.dispatcher.install(logger)
+    }
 
     /**
      * Creates the default camera vendor registry with all supported vendors.

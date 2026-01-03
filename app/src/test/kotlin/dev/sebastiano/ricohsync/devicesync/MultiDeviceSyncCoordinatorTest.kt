@@ -1,18 +1,16 @@
 package dev.sebastiano.ricohsync.devicesync
 
-import android.util.Log
+import dev.sebastiano.ricohsync.RicohSyncApp
 import dev.sebastiano.ricohsync.domain.model.DeviceConnectionState
 import dev.sebastiano.ricohsync.domain.model.GpsLocation
 import dev.sebastiano.ricohsync.domain.model.PairedDevice
 import dev.sebastiano.ricohsync.fakes.FakeCameraConnection
 import dev.sebastiano.ricohsync.fakes.FakeCameraRepository
 import dev.sebastiano.ricohsync.fakes.FakeCameraVendor
+import dev.sebastiano.ricohsync.fakes.FakeKhronicleLogger
 import dev.sebastiano.ricohsync.fakes.FakeLocationCollector
 import dev.sebastiano.ricohsync.fakes.FakePairedDevicesRepository
 import dev.sebastiano.ricohsync.fakes.FakeVendorRegistry
-import io.mockk.every
-import io.mockk.mockkStatic
-import io.mockk.unmockkStatic
 import java.time.ZoneId
 import java.time.ZonedDateTime
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -64,13 +62,8 @@ class MultiDeviceSyncCoordinatorTest {
 
     @Before
     fun setUp() {
-        mockkStatic(Log::class)
-        every { Log.d(any<String>(), any<String>()) } returns 0
-        every { Log.i(any<String>(), any<String>()) } returns 0
-        every { Log.w(any<String>(), any<String>()) } returns 0
-        every { Log.w(any<String>(), any<String>(), any<Throwable>()) } returns 0
-        every { Log.e(any<String>(), any<String>()) } returns 0
-        every { Log.e(any<String>(), any<String>(), any<Throwable>()) } returns 0
+        // Initialize Khronicle with fake logger for tests
+        RicohSyncApp.initializeLogging(FakeKhronicleLogger)
 
         cameraRepository = FakeCameraRepository()
         locationCollector = FakeLocationCollector()
@@ -93,7 +86,6 @@ class MultiDeviceSyncCoordinatorTest {
     @After
     fun tearDown() {
         testScope.backgroundScope.cancel()
-        unmockkStatic(Log::class)
     }
 
     @Test

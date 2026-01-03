@@ -5,11 +5,11 @@ import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
 import android.os.IBinder
-import android.util.Log
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.juul.khronicle.Log
 import dev.sebastiano.ricohsync.devicesync.MultiDeviceSyncService
 import dev.sebastiano.ricohsync.domain.model.DeviceConnectionState
 import dev.sebastiano.ricohsync.domain.model.GpsLocation
@@ -106,7 +106,7 @@ class DevicesListViewModel(
             val connection =
                 object : ServiceConnection {
                     override fun onServiceConnected(name: ComponentName?, binder: IBinder?) {
-                        Log.i(TAG, "Connected to MultiDeviceSyncService")
+                        Log.info(tag = TAG) { "Connected to MultiDeviceSyncService" }
                         service =
                             MultiDeviceSyncService.getInstanceFrom(binder as android.os.Binder)
 
@@ -128,7 +128,7 @@ class DevicesListViewModel(
                     }
 
                     override fun onServiceDisconnected(name: ComponentName?) {
-                        Log.i(TAG, "Disconnected from MultiDeviceSyncService")
+                        Log.info(tag = TAG) { "Disconnected from MultiDeviceSyncService" }
                         service = null
                         stateCollectionJob?.cancel()
                         scanningCollectionJob?.cancel()
@@ -195,7 +195,7 @@ class DevicesListViewModel(
             try {
                 bindingContextProvider().unbindService(connection)
             } catch (e: Exception) {
-                Log.w(TAG, "Error unbinding service", e)
+                Log.warn(tag = TAG, throwable = e) { "Error unbinding service" }
             }
         }
     }

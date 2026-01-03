@@ -1,7 +1,7 @@
 package dev.sebastiano.ricohsync.devicesync
 
 import android.os.Build
-import android.util.Log
+import com.juul.khronicle.Log
 import dev.sebastiano.ricohsync.domain.model.Camera
 import dev.sebastiano.ricohsync.domain.model.GpsLocation
 import dev.sebastiano.ricohsync.domain.model.LocationSyncInfo
@@ -63,7 +63,7 @@ class SyncCoordinator(
      */
     fun startSync(camera: Camera) {
         if (syncJob != null) {
-            Log.w(TAG, "Sync already in progress, ignoring startSync call")
+            Log.warn(tag = TAG) { "Sync already in progress, ignoring startSync call" }
             return
         }
 
@@ -86,10 +86,10 @@ class SyncCoordinator(
 
                     startLocationSync(connection, camera, firmwareVersion)
                 } catch (e: CancellationException) {
-                    Log.i(TAG, "Sync cancelled")
+                    Log.info(tag = TAG) { "Sync cancelled" }
                     throw e
                 } catch (e: Exception) {
-                    Log.e(TAG, "Sync error", e)
+                    Log.error(tag = TAG, throwable = e) { "Sync error" }
                     _state.value = SyncState.Disconnected(camera)
                 } finally {
                     currentConnection?.disconnect()
@@ -134,7 +134,7 @@ class SyncCoordinator(
         val connectionMonitoringJob =
             coroutineScope.launch {
                 connection.isConnected.filter { !it }.first()
-                Log.i(TAG, "Connection lost for ${camera.macAddress}")
+                Log.info(tag = TAG) { "Connection lost for ${camera.macAddress}" }
                 syncJob?.cancel(CancellationException("Connection lost"))
             }
 
@@ -143,7 +143,7 @@ class SyncCoordinator(
                 syncLocationToCamera(connection, location, camera, firmwareVersion)
             }
         } catch (e: CancellationException) {
-            Log.i(TAG, "Location sync cancelled")
+            Log.info(tag = TAG) { "Location sync cancelled" }
             if (_state.value != SyncState.Stopped) {
                 _state.value = SyncState.Disconnected(camera)
             }
@@ -178,7 +178,7 @@ class SyncCoordinator(
 
     /** Stops syncing and disconnects from the camera. */
     suspend fun stopSync() {
-        Log.i(TAG, "Stopping sync")
+        Log.info(tag = TAG) { "Stopping sync" }
         _state.value = SyncState.Stopped
 
         // Cancel and wait for the sync job to complete

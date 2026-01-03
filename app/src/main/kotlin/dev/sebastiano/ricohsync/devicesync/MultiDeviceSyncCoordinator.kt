@@ -1,7 +1,7 @@
 package dev.sebastiano.ricohsync.devicesync
 
 import android.os.Build
-import android.util.Log
+import com.juul.khronicle.Log
 import dev.sebastiano.ricohsync.domain.model.Camera
 import dev.sebastiano.ricohsync.domain.model.DeviceConnectionState
 import dev.sebastiano.ricohsync.domain.model.GpsLocation
@@ -111,7 +111,7 @@ class MultiDeviceSyncCoordinator(
                 launch {
                     while (true) {
                         delay(PERIODIC_SCAN_INTERVAL_MS)
-                        Log.d(TAG, "Running periodic scan for enabled devices...")
+                        Log.debug(tag = TAG) { "Running periodic scan for enabled devices..." }
                         checkAndConnectEnabledDevices()
                     }
                 }
@@ -120,7 +120,7 @@ class MultiDeviceSyncCoordinator(
 
     /** Manually triggers a scan for all enabled but disconnected devices. */
     fun refreshConnections() {
-        Log.i(TAG, "Manual refresh requested")
+        Log.info(tag = TAG) { "Manual refresh requested" }
         coroutineScope.launch { checkAndConnectEnabledDevices() }
     }
 
@@ -138,10 +138,9 @@ class MultiDeviceSyncCoordinator(
                             state is DeviceConnectionState.Unreachable ||
                             (state is DeviceConnectionState.Error && state.isRecoverable)
                     ) {
-                        Log.d(
-                            TAG,
-                            "Device $macAddress is enabled but not connected (state: $state), attempting sync...",
-                        )
+                        Log.debug(tag = TAG) {
+                            "Device $macAddress is enabled but not connected (state: $state), attempting sync..."
+                        }
                         startDeviceSync(device)
                     }
                 }
@@ -167,7 +166,7 @@ class MultiDeviceSyncCoordinator(
 
         val vendor = vendorRegistry.getVendorById(device.vendorId)
         if (vendor == null) {
-            Log.e(TAG, "Unknown vendor ${device.vendorId} for device $macAddress")
+            Log.error(tag = TAG) { "Unknown vendor ${device.vendorId} for device $macAddress" }
             updateDeviceState(
                 macAddress,
                 DeviceConnectionState.Error(
@@ -182,7 +181,7 @@ class MultiDeviceSyncCoordinator(
 
         synchronized(deviceJobs) {
             if (deviceJobs.containsKey(macAddress)) {
-                Log.w(TAG, "Device $macAddress already syncing, ignoring")
+                Log.warn(tag = TAG) { "Device $macAddress already syncing, ignoring" }
                 return
             }
 
@@ -196,7 +195,7 @@ class MultiDeviceSyncCoordinator(
                         // This starts location collection so it's ready by the time we connect
                         locationCollector.registerDevice(macAddress)
 
-                        Log.d(TAG, "Starting connection attempt for $macAddress...")
+                        Log.debug(tag = TAG) { "Starting connection attempt for $macAddress..." }
                         val connection =
                             withTimeout(30_000L) {
                                 connectToCamera(
@@ -224,23 +223,23 @@ class MultiDeviceSyncCoordinator(
 
                         // Wait until the connection is fully established
                         connection.isConnected.filter { it }.first()
-                        Log.i(TAG, "Device $macAddress successfully connected")
+                        Log.info(tag = TAG) { "Device $macAddress successfully connected" }
 
                         // Wait until the connection is lost or the job is cancelled
                         connection.isConnected.filter { !it }.first()
 
-                        Log.i(TAG, "Connection lost for $macAddress")
+                        Log.info(tag = TAG) { "Connection lost for $macAddress" }
                         cleanup(macAddress, preserveErrorState = false)
                     } catch (e: TimeoutCancellationException) {
-                        Log.e(TAG, "Connection timed out for $macAddress")
+                        Log.error(tag = TAG) { "Connection timed out for $macAddress" }
                         updateDeviceState(macAddress, DeviceConnectionState.Unreachable)
                         cleanup(macAddress, preserveErrorState = true)
                     } catch (e: CancellationException) {
-                        Log.i(TAG, "Sync cancelled for $macAddress")
+                        Log.info(tag = TAG) { "Sync cancelled for $macAddress" }
                         cleanup(macAddress, preserveErrorState = false)
                         throw e
                     } catch (e: Exception) {
-                        Log.e(TAG, "Connection error for $macAddress", e)
+                        Log.error(tag = TAG, throwable = e) { "Connection error for $macAddress" }
                         val errorMessage =
                             when {
                                 e.message?.contains("pairing", ignoreCase = true) == true ->
@@ -264,7 +263,7 @@ class MultiDeviceSyncCoordinator(
         camera: Camera,
         onFound: (() -> Unit)? = null,
     ): CameraConnection {
-        Log.i(TAG, "Connecting to ${camera.name ?: camera.macAddress}...")
+        Log.info(tag = TAG) { "Connecting to ${camera.name ?: camera.macAddress}..." }
         return cameraRepository.connect(camera, onFound)
     }
 
@@ -277,7 +276,7 @@ class MultiDeviceSyncCoordinator(
                 try {
                     connection.readFirmwareVersion()
                 } catch (e: Exception) {
-                    Log.w(TAG, "Failed to read firmware version", e)
+                    Log.warn(tag = TAG, throwable = e) { "Failed to read firmware version" }
                     null
                 }
             } else null
@@ -287,7 +286,7 @@ class MultiDeviceSyncCoordinator(
             try {
                 connection.setPairedDeviceName(deviceNameProvider())
             } catch (e: Exception) {
-                Log.w(TAG, "Failed to set paired device name", e)
+                Log.warn(tag = TAG, throwable = e) { "Failed to set paired device name" }
             }
         }
 
@@ -296,7 +295,7 @@ class MultiDeviceSyncCoordinator(
             try {
                 connection.syncDateTime(ZonedDateTime.now())
             } catch (e: Exception) {
-                Log.w(TAG, "Failed to sync date/time", e)
+                Log.warn(tag = TAG, throwable = e) { "Failed to sync date/time" }
             }
         }
 
@@ -305,7 +304,7 @@ class MultiDeviceSyncCoordinator(
             try {
                 connection.setGeoTaggingEnabled(true)
             } catch (e: Exception) {
-                Log.w(TAG, "Failed to enable geo-tagging", e)
+                Log.warn(tag = TAG, throwable = e) { "Failed to enable geo-tagging" }
             }
         }
 
@@ -365,7 +364,7 @@ class MultiDeviceSyncCoordinator(
                     }
                 }
             } catch (e: Exception) {
-                Log.e(TAG, "Failed to sync location to $macAddress", e)
+                Log.error(tag = TAG, throwable = e) { "Failed to sync location to $macAddress" }
                 // Don't update state to error for sync failures - device is still connected
             }
         }
@@ -377,7 +376,7 @@ class MultiDeviceSyncCoordinator(
      * @param macAddress The MAC address of the device to stop.
      */
     suspend fun stopDeviceSync(macAddress: String) {
-        Log.i(TAG, "Stopping sync for $macAddress")
+        Log.info(tag = TAG) { "Stopping sync for $macAddress" }
 
         val job = synchronized(deviceJobs) { deviceJobs[macAddress] }
 
@@ -389,7 +388,7 @@ class MultiDeviceSyncCoordinator(
 
     /** Stops syncing with all devices and stops background monitoring. */
     suspend fun stopAllDevices() {
-        Log.i(TAG, "Stopping all device syncs")
+        Log.info(tag = TAG) { "Stopping all device syncs" }
 
         backgroundMonitoringJob?.cancel()
         backgroundMonitoringJob = null
@@ -422,7 +421,7 @@ class MultiDeviceSyncCoordinator(
                 try {
                     connection.disconnect()
                 } catch (e: Exception) {
-                    Log.w(TAG, "Error disconnecting from $macAddress", e)
+                    Log.warn(tag = TAG, throwable = e) { "Error disconnecting from $macAddress" }
                 }
             }
             deviceConnections.remove(macAddress)
@@ -490,7 +489,7 @@ class MultiDeviceSyncCoordinator(
             currentState is DeviceConnectionState.Unreachable ||
                 (currentState is DeviceConnectionState.Error && currentState.isRecoverable)
         ) {
-            Log.i(TAG, "Retrying connection for $macAddress")
+            Log.info(tag = TAG) { "Retrying connection for $macAddress" }
             startDeviceSync(device)
         }
     }

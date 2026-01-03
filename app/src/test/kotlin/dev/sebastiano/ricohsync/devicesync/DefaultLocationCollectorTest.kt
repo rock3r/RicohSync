@@ -1,11 +1,9 @@
 package dev.sebastiano.ricohsync.devicesync
 
-import android.util.Log
+import dev.sebastiano.ricohsync.RicohSyncApp
 import dev.sebastiano.ricohsync.domain.model.GpsLocation
+import dev.sebastiano.ricohsync.fakes.FakeKhronicleLogger
 import dev.sebastiano.ricohsync.fakes.FakeLocationRepository
-import io.mockk.every
-import io.mockk.mockkStatic
-import io.mockk.unmockkStatic
 import java.time.ZoneId
 import java.time.ZonedDateTime
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -39,9 +37,8 @@ class DefaultLocationCollectorTest {
 
     @Before
     fun setUp() {
-        mockkStatic(Log::class)
-        every { Log.d(any<String>(), any<String>()) } returns 0
-        every { Log.i(any<String>(), any<String>()) } returns 0
+        // Initialize Khronicle with fake logger for tests
+        RicohSyncApp.initializeLogging(FakeKhronicleLogger)
 
         locationRepository = FakeLocationRepository()
         testScope = TestScope(UnconfinedTestDispatcher())
@@ -56,7 +53,6 @@ class DefaultLocationCollectorTest {
     @After
     fun tearDown() {
         testScope.backgroundScope.cancel()
-        unmockkStatic(Log::class)
     }
 
     @Test

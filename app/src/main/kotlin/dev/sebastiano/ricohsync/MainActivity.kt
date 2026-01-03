@@ -31,6 +31,10 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Initialize Khronicle logging via DI
+        RicohSyncApp.initializeLogging()
+
         enableEdgeToEdge()
         registerNotificationChannel(this)
 
@@ -110,12 +114,14 @@ private fun RootComposable(
                             viewModel = pairingViewModel,
                             onNavigateBack = {
                                 // Can't use removeLast before API 35
-                                // Ensure we don't remove the last item (must keep at least one route)
+                                // Ensure we don't remove the last item (must keep at least one
+                                // route)
                                 if (backStack.size > 1) backStack.removeAt(backStack.lastIndex)
                             },
                             onDevicePaired = {
                                 // Can't use removeLast before API 35
-                                // Ensure we don't remove the last item (must keep at least one route)
+                                // Ensure we don't remove the last item (must keep at least one
+                                // route)
                                 if (backStack.size > 1) backStack.removeAt(backStack.lastIndex)
                             },
                         )

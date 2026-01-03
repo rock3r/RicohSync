@@ -66,7 +66,8 @@ This is an Android project built with:
 ### Testing
 - Unit tests use coroutine test dispatchers with `TestScope`
 - All repository interfaces have fake implementations in `test/fakes/`
-- Mock `android.util.Log` in tests using MockK
+- Use Khronicle for logging throughout the app (initialized in MainActivity)
+- Kable logging uses KhronicleLogEngine adapter
 
 ### Testing Notes
 - Primary test configuration: Pixel 9 + Android 15 + Ricoh GR IIIx

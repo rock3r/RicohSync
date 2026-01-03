@@ -59,7 +59,6 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.scale
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -304,9 +303,7 @@ private fun DiscoveredDeviceCard(camera: Camera, onClick: () -> Unit) {
     val pulseAlpha = rememberPulseAlpha(label = "card_pulse")
 
     ElevatedCard(
-        modifier =
-            Modifier.fillMaxWidth()
-                .clickable(onClick = onClick),
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
         shape = MaterialTheme.shapes.medium,
         elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp),
         colors =

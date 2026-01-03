@@ -1,17 +1,15 @@
 package dev.sebastiano.ricohsync.devicesync
 
-import android.util.Log
+import dev.sebastiano.ricohsync.RicohSyncApp
 import dev.sebastiano.ricohsync.domain.model.GpsLocation
 import dev.sebastiano.ricohsync.domain.model.RicohCamera
 import dev.sebastiano.ricohsync.domain.model.SyncState
 import dev.sebastiano.ricohsync.fakes.FakeCameraConnection
 import dev.sebastiano.ricohsync.fakes.FakeCameraRepository
+import dev.sebastiano.ricohsync.fakes.FakeKhronicleLogger
 import dev.sebastiano.ricohsync.fakes.FakeLocationRepository
 import dev.sebastiano.ricohsync.fakes.FakePairedDevicesRepository
 import dev.sebastiano.ricohsync.vendors.ricoh.RicohCameraVendor
-import io.mockk.every
-import io.mockk.mockkStatic
-import io.mockk.unmockkStatic
 import java.time.ZoneId
 import java.time.ZonedDateTime
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -55,12 +53,8 @@ class SyncCoordinatorTest {
 
     @Before
     fun setUp() {
-        mockkStatic(Log::class)
-        every { Log.d(any<String>(), any<String>()) } returns 0
-        every { Log.i(any<String>(), any<String>()) } returns 0
-        every { Log.w(any<String>(), any<String>()) } returns 0
-        every { Log.e(any<String>(), any<String>()) } returns 0
-        every { Log.e(any<String>(), any<String>(), any<Throwable>()) } returns 0
+        // Initialize Khronicle with fake logger for tests
+        RicohSyncApp.initializeLogging(FakeKhronicleLogger)
 
         cameraRepository = FakeCameraRepository()
         locationRepository = FakeLocationRepository()
@@ -84,7 +78,6 @@ class SyncCoordinatorTest {
     fun tearDown() {
         // Cancel all background jobs in the test scope
         testScope.backgroundScope.cancel()
-        unmockkStatic(Log::class)
     }
 
     @Test

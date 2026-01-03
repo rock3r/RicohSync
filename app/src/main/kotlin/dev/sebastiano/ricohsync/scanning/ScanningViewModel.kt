@@ -1,7 +1,6 @@
 package dev.sebastiano.ricohsync.scanning
 
 import android.bluetooth.le.ScanSettings
-import android.util.Log
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
@@ -12,10 +11,11 @@ import com.juul.kable.ObsoleteKableApi
 import com.juul.kable.PlatformAdvertisement
 import com.juul.kable.Scanner
 import com.juul.kable.logs.Logging
-import com.juul.kable.logs.SystemLogEngine
+import com.juul.khronicle.Log
 import dev.sebastiano.ricohsync.RicohSyncApp
 import dev.sebastiano.ricohsync.domain.model.Camera
 import dev.sebastiano.ricohsync.domain.vendor.CameraVendorRegistry
+import dev.sebastiano.ricohsync.logging.KhronicleLogEngine
 import kotlin.uuid.ExperimentalUuidApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -48,7 +48,7 @@ internal class ScanningViewModel : ViewModel() {
     private val scanner = Scanner {
         // No filters to allow all devices and filter in onDiscovery
         logging {
-            engine = SystemLogEngine
+            engine = KhronicleLogEngine
             level = Logging.Level.Events
             format = Logging.Format.Multiline
         }
@@ -73,8 +73,8 @@ internal class ScanningViewModel : ViewModel() {
                     }
                     onDiscovery(advertisement)
                 }
-                .onStart { Log.i(TAG, "BLE scan started") }
-                .onCompletion { Log.i(TAG, "BLE scan completed") }
+                .onStart { Log.info(tag = TAG) { "BLE scan started" } }
+                .onCompletion { Log.info(tag = TAG) { "BLE scan completed" } }
                 .flowOn(Dispatchers.IO)
                 .launchIn(viewModelScope)
     }
@@ -114,11 +114,11 @@ internal class ScanningViewModel : ViewModel() {
             vendorRegistry.identifyVendor(deviceName = peripheralName ?: name, serviceUuids = uuids)
 
         if (vendor == null) {
-            Log.w(TAG, "No vendor recognized for device: ${peripheralName ?: name}")
+            Log.warn(tag = TAG) { "No vendor recognized for device: ${peripheralName ?: name}" }
             return null
         }
 
-        Log.i(TAG, "Discovered ${vendor.vendorName} camera: ${peripheralName ?: name}")
+        Log.info(tag = TAG) { "Discovered ${vendor.vendorName} camera: ${peripheralName ?: name}" }
         return Camera(
             identifier = identifier,
             name = peripheralName ?: name,

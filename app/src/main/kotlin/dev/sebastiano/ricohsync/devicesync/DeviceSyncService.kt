@@ -9,7 +9,6 @@ import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.os.Binder
 import android.os.IBinder
-import android.util.Log
 import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.app.ServiceCompat
@@ -17,6 +16,7 @@ import androidx.core.content.PermissionChecker
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
+import com.juul.khronicle.Log
 import dev.sebastiano.ricohsync.data.repository.DataStorePairedDevicesRepository
 import dev.sebastiano.ricohsync.data.repository.FusedLocationRepository
 import dev.sebastiano.ricohsync.data.repository.KableCameraRepository
@@ -85,7 +85,7 @@ internal class DeviceSyncService : Service(), CoroutineScope {
             .addObserver(
                 object : DefaultLifecycleObserver {
                     override fun onStart(owner: LifecycleOwner) {
-                        Log.d(TAG, "App brought to foreground, stopping vibration")
+                        Log.debug(tag = TAG) { "App brought to foreground, stopping vibration" }
                         vibrator.stop()
                     }
                 }
@@ -102,7 +102,7 @@ internal class DeviceSyncService : Service(), CoroutineScope {
     override fun onStartCommand(intent: Intent, flags: Int, startId: Int): Int {
         when (intent.action) {
             STOP_INTENT_ACTION -> {
-                Log.i(TAG, "Received stop intent, disconnecting...")
+                Log.info(tag = TAG) { "Received stop intent, disconnecting..." }
                 launch { stopAndDisconnect() }
             }
             else -> {
@@ -149,7 +149,7 @@ internal class DeviceSyncService : Service(), CoroutineScope {
             )
         } catch (e: Exception) {
             if (e is ForegroundServiceStartNotAllowedException) {
-                Log.e(TAG, "Cannot start foreground service", e)
+                Log.error(tag = TAG, throwable = e) { "Cannot start foreground service" }
             }
         }
     }
@@ -187,7 +187,9 @@ internal class DeviceSyncService : Service(), CoroutineScope {
                 PackageManager.PERMISSION_GRANTED
 
         if (!hasNotificationPermission) {
-            Log.e(TAG, "Cannot show missing permission notification: $missingPermission")
+            Log.error(tag = TAG) {
+                "Cannot show missing permission notification: $missingPermission"
+            }
             return
         }
 
