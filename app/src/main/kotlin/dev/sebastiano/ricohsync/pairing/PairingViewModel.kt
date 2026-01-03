@@ -61,6 +61,11 @@ class PairingViewModel(private val pairedDevicesRepository: PairedDevicesReposit
 
     private val discoveredDevices = mutableMapOf<String, Camera>()
 
+    init {
+        // Automatically start scanning when the ViewModel is created
+        startScanning()
+    }
+
     /** Starts scanning for cameras. */
     fun startScanning() {
         if (scanJob != null) return
