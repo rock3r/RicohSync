@@ -2,6 +2,7 @@ package dev.sebastiano.camerasync.devicesync
 
 import android.app.Notification
 import android.app.PendingIntent
+import androidx.core.app.NotificationCompat
 
 /**
  * Interface for building notifications, allowing testability by providing a fake implementation.
@@ -13,7 +14,7 @@ interface NotificationBuilder {
         content: String,
         icon: Int,
         isOngoing: Boolean = false,
-        priority: Int = android.app.Notification.PRIORITY_DEFAULT,
+        priority: Int = NotificationCompat.PRIORITY_DEFAULT,
         category: String? = null,
         isSilent: Boolean = false,
         actions: List<NotificationAction> = emptyList(),

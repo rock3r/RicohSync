@@ -20,7 +20,7 @@ import com.juul.khronicle.Log
 import dev.sebastiano.camerasync.CameraSyncApp
 import dev.sebastiano.camerasync.data.repository.DataStorePairedDevicesRepository
 import dev.sebastiano.camerasync.data.repository.pairedDevicesDataStoreV2
-import dev.sebastiano.camerasync.domain.model.RicohCamera
+import dev.sebastiano.camerasync.domain.model.Camera
 import dev.sebastiano.camerasync.domain.model.SyncState
 import dev.sebastiano.camerasync.domain.repository.PairedDevicesRepository
 import kotlin.coroutines.CoroutineContext
@@ -115,7 +115,7 @@ internal class DeviceSyncService : Service(), CoroutineScope {
      *
      * @param camera The camera to connect to.
      */
-    fun connectAndSync(camera: RicohCamera) {
+    fun connectAndSync(camera: Camera) {
         syncCoordinator.startSync(camera)
 
         // Update notification when state changes
@@ -197,11 +197,6 @@ internal class DeviceSyncService : Service(), CoroutineScope {
     private fun updateNotification(state: SyncState) {
         val notification = createForegroundServiceNotification(this, state)
         startForeground(NOTIFICATION_ID, notification)
-    }
-
-    override fun onUnbind(intent: Intent?): Boolean {
-        // Location updates are now managed by SyncCoordinator
-        return super.onUnbind(intent)
     }
 
     inner class DeviceSyncServiceBinder : Binder() {

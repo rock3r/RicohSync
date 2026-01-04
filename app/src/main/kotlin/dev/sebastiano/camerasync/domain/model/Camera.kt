@@ -14,14 +14,3 @@ data class Camera(
     val macAddress: String,
     val vendor: CameraVendor,
 )
-
-/**
- * Type alias for backward compatibility.
- *
- * @deprecated Use [Camera] instead.
- */
-@Deprecated(
-    message = "Use Camera instead",
-    replaceWith = ReplaceWith("Camera", "dev.sebastiano.camerasync.domain.model.Camera"),
-)
-typealias RicohCamera = Camera

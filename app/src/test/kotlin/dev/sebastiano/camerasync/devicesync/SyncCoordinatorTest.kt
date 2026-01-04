@@ -1,8 +1,8 @@
 package dev.sebastiano.camerasync.devicesync
 
 import dev.sebastiano.camerasync.CameraSyncApp
+import dev.sebastiano.camerasync.domain.model.Camera
 import dev.sebastiano.camerasync.domain.model.GpsLocation
-import dev.sebastiano.camerasync.domain.model.RicohCamera
 import dev.sebastiano.camerasync.domain.model.SyncState
 import dev.sebastiano.camerasync.fakes.FakeCameraConnection
 import dev.sebastiano.camerasync.fakes.FakeCameraRepository
@@ -36,7 +36,7 @@ class SyncCoordinatorTest {
     private lateinit var syncCoordinator: SyncCoordinator
 
     private val testCamera =
-        RicohCamera(
+        Camera(
             identifier = "00:11:22:33:44:55",
             name = "GR IIIx",
             macAddress = "00:11:22:33:44:55",

@@ -1,10 +1,12 @@
 package dev.sebastiano.camerasync.data.encoding
 
 import dev.sebastiano.camerasync.domain.model.GpsLocation
+import dev.sebastiano.camerasync.vendors.ricoh.RicohProtocol
 import java.time.ZoneId
 import java.time.ZonedDateTime
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class RicohProtocolTest {
@@ -22,12 +24,7 @@ class RicohProtocolTest {
         val encoded = RicohProtocol.encodeDateTime(dateTime)
         val decoded = RicohProtocol.decodeDateTime(encoded)
 
-        assertEquals(2024, decoded.year)
-        assertEquals(12, decoded.month)
-        assertEquals(25, decoded.day)
-        assertEquals(14, decoded.hour)
-        assertEquals(30, decoded.minute)
-        assertEquals(45, decoded.second)
+        assertEquals("2024-12-25 14:30:45", decoded)
     }
 
     @Test
@@ -38,19 +35,8 @@ class RicohProtocolTest {
         val decodedEve = RicohProtocol.decodeDateTime(RicohProtocol.encodeDateTime(newYearEve))
         val decodedNew = RicohProtocol.decodeDateTime(RicohProtocol.encodeDateTime(newYear))
 
-        assertEquals(2023, decodedEve.year)
-        assertEquals(12, decodedEve.month)
-        assertEquals(31, decodedEve.day)
-        assertEquals(23, decodedEve.hour)
-        assertEquals(59, decodedEve.minute)
-        assertEquals(59, decodedEve.second)
-
-        assertEquals(2024, decodedNew.year)
-        assertEquals(1, decodedNew.month)
-        assertEquals(1, decodedNew.day)
-        assertEquals(0, decodedNew.hour)
-        assertEquals(0, decodedNew.minute)
-        assertEquals(0, decodedNew.second)
+        assertEquals("2023-12-31 23:59:59", decodedEve)
+        assertEquals("2024-01-01 00:00:00", decodedNew)
     }
 
     @Test
@@ -98,15 +84,10 @@ class RicohProtocolTest {
         val encoded = RicohProtocol.encodeLocation(location)
         val decoded = RicohProtocol.decodeLocation(encoded)
 
-        assertEquals(37.7749, decoded.latitude, 0.0001)
-        assertEquals(-122.4194, decoded.longitude, 0.0001)
-        assertEquals(10.5, decoded.altitude, 0.0001)
-        assertEquals(2024, decoded.dateTime.year)
-        assertEquals(12, decoded.dateTime.month)
-        assertEquals(25, decoded.dateTime.day)
-        assertEquals(14, decoded.dateTime.hour)
-        assertEquals(30, decoded.dateTime.minute)
-        assertEquals(45, decoded.dateTime.second)
+        assertTrue(decoded.contains("37.7749"))
+        assertTrue(decoded.contains("-122.4194"))
+        assertTrue(decoded.contains("10.5"))
+        assertTrue(decoded.contains("2024-12-25 14:30:45"))
     }
 
     @Test
@@ -120,7 +101,7 @@ class RicohProtocolTest {
                 timestamp = ZonedDateTime.of(2024, 1, 1, 0, 0, 0, 0, ZoneId.of("UTC")),
             )
         val decodedNorth = RicohProtocol.decodeLocation(RicohProtocol.encodeLocation(northPole))
-        assertEquals(90.0, decodedNorth.latitude, 0.0001)
+        assertTrue(decodedNorth.contains("90.0"))
 
         // South Pole
         val southPole =
@@ -131,7 +112,7 @@ class RicohProtocolTest {
                 timestamp = ZonedDateTime.of(2024, 1, 1, 0, 0, 0, 0, ZoneId.of("UTC")),
             )
         val decodedSouth = RicohProtocol.decodeLocation(RicohProtocol.encodeLocation(southPole))
-        assertEquals(-90.0, decodedSouth.latitude, 0.0001)
+        assertTrue(decodedSouth.contains("-90.0"))
 
         // International Date Line
         val dateLine =
@@ -142,7 +123,7 @@ class RicohProtocolTest {
                 timestamp = ZonedDateTime.of(2024, 1, 1, 0, 0, 0, 0, ZoneId.of("UTC")),
             )
         val decodedDateLine = RicohProtocol.decodeLocation(RicohProtocol.encodeLocation(dateLine))
-        assertEquals(180.0, decodedDateLine.longitude, 0.0001)
+        assertTrue(decodedDateLine.contains("180.0"))
     }
 
     @Test
@@ -156,7 +137,7 @@ class RicohProtocolTest {
                 timestamp = ZonedDateTime.of(2024, 1, 1, 0, 0, 0, 0, ZoneId.of("UTC")),
             )
         val decoded = RicohProtocol.decodeLocation(RicohProtocol.encodeLocation(deadSea))
-        assertEquals(-430.0, decoded.altitude, 0.0001)
+        assertTrue(decoded.contains("-430.0"))
     }
 
     @Test
@@ -170,7 +151,7 @@ class RicohProtocolTest {
                 timestamp = ZonedDateTime.of(2024, 1, 1, 0, 0, 0, 0, ZoneId.of("UTC")),
             )
         val decoded = RicohProtocol.decodeLocation(RicohProtocol.encodeLocation(everest))
-        assertEquals(8848.86, decoded.altitude, 0.01)
+        assertTrue(decoded.contains("8848.86"))
     }
 
     @Test
@@ -209,23 +190,26 @@ class RicohProtocolTest {
 
     @Test
     fun `DecodedDateTime toString formats correctly`() {
-        val decoded = DecodedDateTime(2024, 1, 5, 9, 3, 7)
-        assertEquals("2024-01-05 09:03:07", decoded.toString())
+        val dateTime = ZonedDateTime.of(2024, 1, 5, 9, 3, 7, 0, ZoneId.of("UTC"))
+        val encoded = RicohProtocol.encodeDateTime(dateTime)
+        val decoded = RicohProtocol.decodeDateTime(encoded)
+        assertEquals("2024-01-05 09:03:07", decoded)
     }
 
     @Test
     fun `DecodedLocation toString formats correctly`() {
-        val decoded =
-            DecodedLocation(
+        val location =
+            GpsLocation(
                 latitude = 37.7749,
                 longitude = -122.4194,
                 altitude = 10.5,
-                dateTime = DecodedDateTime(2024, 12, 25, 14, 30, 45),
+                timestamp = ZonedDateTime.of(2024, 12, 25, 14, 30, 45, 0, ZoneId.of("UTC")),
             )
-        val str = decoded.toString()
-        assert(str.contains("37.7749"))
-        assert(str.contains("-122.4194"))
-        assert(str.contains("10.5"))
-        assert(str.contains("2024-12-25 14:30:45"))
+        val encoded = RicohProtocol.encodeLocation(location)
+        val str = RicohProtocol.decodeLocation(encoded)
+        assertTrue(str.contains("37.7749"))
+        assertTrue(str.contains("-122.4194"))
+        assertTrue(str.contains("10.5"))
+        assertTrue(str.contains("2024-12-25 14:30:45"))
     }
 }
