@@ -18,10 +18,7 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
 import com.juul.khronicle.Log
 import dev.sebastiano.ricohsync.RicohSyncApp
-import dev.sebastiano.ricohsync.data.repository.DataStorePairedDevicesRepository
-import dev.sebastiano.ricohsync.data.repository.FusedLocationRepository
-import dev.sebastiano.ricohsync.data.repository.KableCameraRepository
-import dev.sebastiano.ricohsync.data.repository.pairedDevicesDataStoreV2
+import dev.sebastiano.ricohsync.di.AppGraph
 import dev.sebastiano.ricohsync.domain.model.DeviceConnectionState
 import dev.sebastiano.ricohsync.domain.model.PairedDevice
 import dev.sebastiano.ricohsync.domain.repository.PairedDevicesRepository
@@ -59,23 +56,23 @@ class MultiDeviceSyncService : Service(), CoroutineScope {
 
     private val binder by lazy { MultiDeviceSyncServiceBinder() }
 
-    private val vendorRegistry by lazy { RicohSyncApp.createVendorRegistry() }
-
-    private val locationRepository by lazy {
-        FusedLocationRepository(
-            context = applicationContext,
-            updateIntervalSeconds = LOCATION_UPDATE_INTERVAL_SECONDS,
-        )
+    // Access dependency graph from Application
+    private val graph: AppGraph by lazy {
+        (applicationContext.applicationContext as RicohSyncApp).appGraph
     }
+
+    private val vendorRegistry by lazy { graph.vendorRegistry }
+    private val locationRepository by lazy { graph.locationRepository }
+    private val cameraRepository by lazy { graph.cameraRepository }
+    private val pairedDevicesRepository: PairedDevicesRepository by lazy {
+        graph.pairedDevicesRepository
+    }
+    private val notificationBuilder by lazy { graph.notificationBuilder }
+    private val intentFactory by lazy { graph.intentFactory }
+    private val pendingIntentFactory by lazy { graph.pendingIntentFactory }
 
     private val locationCollector by lazy {
         DefaultLocationCollector(locationRepository = locationRepository, coroutineScope = this)
-    }
-
-    private val cameraRepository by lazy { KableCameraRepository(vendorRegistry = vendorRegistry) }
-
-    private val pairedDevicesRepository: PairedDevicesRepository by lazy {
-        DataStorePairedDevicesRepository(applicationContext.pairedDevicesDataStoreV2)
     }
 
     private val syncCoordinator by lazy {
@@ -159,6 +156,9 @@ class MultiDeviceSyncService : Service(), CoroutineScope {
                 this,
                 NOTIFICATION_ID,
                 createMultiDeviceNotification(
+                    notificationBuilder = notificationBuilder,
+                    pendingIntentFactory = pendingIntentFactory,
+                    intentFactory = intentFactory,
                     context = this,
                     connectedCount = 0,
                     totalEnabled = 0,
@@ -260,6 +260,9 @@ class MultiDeviceSyncService : Service(), CoroutineScope {
     ) {
         val notification =
             createMultiDeviceNotification(
+                notificationBuilder = notificationBuilder,
+                pendingIntentFactory = pendingIntentFactory,
+                intentFactory = intentFactory,
                 context = this,
                 connectedCount = connectedCount,
                 totalEnabled = enabledCount,

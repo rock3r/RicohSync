@@ -22,6 +22,11 @@ class FakeCameraRepository : CameraRepository {
     var connectDelay = 0L
     var connectException: Exception? = null
     var connectionToReturn: FakeCameraConnection? = null
+    /**
+     * When true, throws exception if connectionToReturn is null (default: false for backward
+     * compatibility)
+     */
+    var failIfConnectionNull = false
     var cameraToReturn: Camera? = null
     var connectCallCount = 0
         private set
@@ -43,6 +48,9 @@ class FakeCameraRepository : CameraRepository {
         if (connectDelay > 0) delay(connectDelay)
         onFound?.invoke()
         connectException?.let { throw it }
+        if (failIfConnectionNull && connectionToReturn == null) {
+            throw RuntimeException("Connection not available (connectionToReturn is null)")
+        }
         return connectionToReturn ?: FakeCameraConnection(camera)
     }
 

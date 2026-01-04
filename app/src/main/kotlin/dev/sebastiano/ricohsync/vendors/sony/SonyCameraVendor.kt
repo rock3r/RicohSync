@@ -28,7 +28,14 @@ object SonyCameraVendor : CameraVendor {
         val hasSonyService =
             serviceUuids.any { uuid -> SonyGattSpec.scanFilterServiceUuids.contains(uuid) }
 
-        // Additional check: device name typically starts with "ILCE-" for Alpha cameras
+        // If service UUIDs are provided, only recognize if Sony service UUID is present
+        // (Don't trust name matching when service UUIDs are explicitly provided)
+        if (serviceUuids.isNotEmpty()) {
+            return hasSonyService
+        }
+
+        // If no service UUIDs are provided, fall back to name pattern matching
+        // This handles cases where service UUIDs aren't advertised in the scan
         val hasSonyName =
             deviceName?.let { name ->
                 SonyGattSpec.scanFilterDeviceNames.any { prefix ->
@@ -36,8 +43,7 @@ object SonyCameraVendor : CameraVendor {
                 }
             } ?: false
 
-        // Accept device if it has the Sony service UUID or a recognized name
-        return hasSonyService || hasSonyName
+        return hasSonyName
     }
 
     override fun getCapabilities(): CameraCapabilities {

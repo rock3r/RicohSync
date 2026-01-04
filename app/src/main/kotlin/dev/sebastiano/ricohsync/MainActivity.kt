@@ -22,13 +22,10 @@ import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.ui.NavDisplay
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.rememberMultiplePermissionsState
-import dev.sebastiano.ricohsync.data.repository.DataStorePairedDevicesRepository
-import dev.sebastiano.ricohsync.data.repository.FusedLocationRepository
-import dev.sebastiano.ricohsync.data.repository.pairedDevicesDataStoreV2
 import dev.sebastiano.ricohsync.devices.DevicesListScreen
 import dev.sebastiano.ricohsync.devices.DevicesListViewModel
 import dev.sebastiano.ricohsync.devicesync.registerNotificationChannel
-import dev.sebastiano.ricohsync.domain.repository.LocationRepository
+import dev.sebastiano.ricohsync.di.AppGraph
 import dev.sebastiano.ricohsync.pairing.PairingScreen
 import dev.sebastiano.ricohsync.pairing.PairingViewModel
 import dev.sebastiano.ricohsync.permissions.PermissionsScreen
@@ -36,41 +33,24 @@ import dev.sebastiano.ricohsync.ui.theme.RicohSyncTheme
 
 class MainActivity : ComponentActivity() {
 
+    private val appGraph: AppGraph by lazy { (application as RicohSyncApp).appGraph }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-        // Initialize Khronicle logging via DI
-        RicohSyncApp.initializeLogging()
 
         enableEdgeToEdge()
         registerNotificationChannel(this)
 
-        val pairedDevicesRepository = DataStorePairedDevicesRepository(pairedDevicesDataStoreV2)
-        val locationRepository = FusedLocationRepository(applicationContext)
-        val vendorRegistry = RicohSyncApp.createVendorRegistry()
-        val viewModel = MainViewModel(pairedDevicesRepository)
-
-        setContent {
-            RootComposable(
-                viewModel = viewModel,
-                pairedDevicesRepository = pairedDevicesRepository,
-                locationRepository = locationRepository,
-                vendorRegistry = vendorRegistry,
-                context = this,
-            )
-        }
+        setContent { RootComposable(appGraph = appGraph, context = this) }
     }
 }
 
 @OptIn(ExperimentalPermissionsApi::class)
 @Composable
-private fun RootComposable(
-    viewModel: MainViewModel,
-    pairedDevicesRepository: DataStorePairedDevicesRepository,
-    locationRepository: LocationRepository,
-    vendorRegistry: dev.sebastiano.ricohsync.domain.vendor.CameraVendorRegistry,
-    context: Context,
-) {
+private fun RootComposable(appGraph: AppGraph, context: Context) {
+    val pairedDevicesRepository = appGraph.pairedDevicesRepository
+    val locationRepository = appGraph.locationRepository
+    val vendorRegistry = appGraph.vendorRegistry
     RicohSyncTheme {
         val allPermissions =
             listOf(ACCESS_FINE_LOCATION, BLUETOOTH_SCAN, BLUETOOTH_CONNECT, POST_NOTIFICATIONS)
@@ -139,7 +119,10 @@ private fun RootComposable(
 
                     NavRoute.Pairing -> {
                         val pairingViewModel = remember {
-                            PairingViewModel(pairedDevicesRepository = pairedDevicesRepository)
+                            PairingViewModel(
+                                pairedDevicesRepository = pairedDevicesRepository,
+                                vendorRegistry = vendorRegistry,
+                            )
                         }
 
                         PairingScreen(

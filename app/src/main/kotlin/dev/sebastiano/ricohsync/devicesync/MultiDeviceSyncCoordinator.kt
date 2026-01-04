@@ -131,25 +131,33 @@ class MultiDeviceSyncCoordinator(
                 val enabledDevices = enabledDevicesFlow.value
                 val enabledMacAddresses = enabledDevices.map { it.macAddress }.toSet()
 
-                // First, disconnect any devices that are connected but no longer enabled
-                jobsMutex.withLock {
-                    val connectedDevices = deviceConnections.keys.toList()
-                    connectedDevices.forEach { macAddress ->
-                        if (!enabledMacAddresses.contains(macAddress)) {
-                            val state = getDeviceState(macAddress)
-                            if (
-                                state is DeviceConnectionState.Connected ||
-                                    state is DeviceConnectionState.Syncing ||
-                                    state is DeviceConnectionState.Connecting ||
-                                    state is DeviceConnectionState.Searching
-                            ) {
-                                Log.info(tag = TAG) {
-                                    "Device $macAddress is connected but no longer enabled, disconnecting..."
+                // First, collect devices to disconnect while holding the mutex
+                // We must NOT call stopDeviceSync while holding jobsMutex to avoid deadlock
+                // (stopDeviceSync calls job.join() which eventually calls cleanup() which
+                // also needs jobsMutex)
+                val devicesToDisconnect =
+                    jobsMutex.withLock {
+                        deviceConnections.keys
+                            .filter { macAddress ->
+                                if (!enabledMacAddresses.contains(macAddress)) {
+                                    val state = getDeviceState(macAddress)
+                                    state is DeviceConnectionState.Connected ||
+                                        state is DeviceConnectionState.Syncing ||
+                                        state is DeviceConnectionState.Connecting ||
+                                        state is DeviceConnectionState.Searching
+                                } else {
+                                    false
                                 }
-                                stopDeviceSync(macAddress)
                             }
-                        }
+                            .toList()
                     }
+
+                // Now disconnect outside the mutex to avoid deadlock
+                devicesToDisconnect.forEach { macAddress ->
+                    Log.info(tag = TAG) {
+                        "Device $macAddress is connected but no longer enabled, disconnecting..."
+                    }
+                    stopDeviceSync(macAddress)
                 }
 
                 // Then, connect devices that are enabled but not connected
@@ -479,9 +487,13 @@ class MultiDeviceSyncCoordinator(
             locationSyncJob = null
         }
 
-        // Update state to disconnected (unless we want to preserve error state)
+        // Update state to disconnected (unless we want to preserve error/unreachable state)
         val currentState = getDeviceState(macAddress)
-        if (!(preserveErrorState && currentState is DeviceConnectionState.Error)) {
+        val shouldPreserve =
+            preserveErrorState &&
+                (currentState is DeviceConnectionState.Error ||
+                    currentState is DeviceConnectionState.Unreachable)
+        if (!shouldPreserve) {
             updateDeviceState(macAddress, DeviceConnectionState.Disconnected)
         }
     }

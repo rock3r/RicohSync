@@ -18,6 +18,7 @@ import dev.sebastiano.ricohsync.domain.model.PairedDeviceWithState
 import dev.sebastiano.ricohsync.domain.repository.LocationRepository
 import dev.sebastiano.ricohsync.domain.repository.PairedDevicesRepository
 import dev.sebastiano.ricohsync.domain.vendor.CameraVendorRegistry
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -32,12 +33,16 @@ private const val TAG = "DevicesListViewModel"
  *
  * Manages the list of paired devices and their connection states. Communicates with the
  * [MultiDeviceSyncService] to control device sync.
+ *
+ * @param ioDispatcher The dispatcher to use for IO operations. Defaults to [Dispatchers.IO]. Can be
+ *   overridden in tests to use a test dispatcher.
  */
 class DevicesListViewModel(
     private val pairedDevicesRepository: PairedDevicesRepository,
     private val locationRepository: LocationRepository,
     private val bindingContextProvider: () -> Context,
     private val vendorRegistry: CameraVendorRegistry,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : ViewModel() {
 
     private val _state = mutableStateOf<DevicesListState>(DevicesListState.Loading)
@@ -58,7 +63,7 @@ class DevicesListViewModel(
     }
 
     private fun observeDevices() {
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(ioDispatcher) {
             combine(
                     pairedDevicesRepository.pairedDevices,
                     deviceStatesFromService,
@@ -101,7 +106,7 @@ class DevicesListViewModel(
             val intent = Intent(context, MultiDeviceSyncService::class.java)
 
             // Start the service if there are enabled devices AND global sync is enabled
-            viewModelScope.launch(Dispatchers.IO) {
+            viewModelScope.launch(ioDispatcher) {
                 if (
                     pairedDevicesRepository.hasEnabledDevices() &&
                         pairedDevicesRepository.isSyncEnabled.first()
@@ -119,7 +124,7 @@ class DevicesListViewModel(
 
                         // Observe device states from service
                         stateCollectionJob =
-                            viewModelScope.launch(Dispatchers.IO) {
+                            viewModelScope.launch(ioDispatcher) {
                                 service?.deviceStates?.collect { states ->
                                     deviceStatesFromService.value = states
                                 }
@@ -127,7 +132,7 @@ class DevicesListViewModel(
 
                         // Observe scanning state from service
                         scanningCollectionJob =
-                            viewModelScope.launch(Dispatchers.IO) {
+                            viewModelScope.launch(ioDispatcher) {
                                 service?.isScanning?.collect { isScanning ->
                                     isScanningFromService.value = isScanning
                                 }
@@ -151,7 +156,7 @@ class DevicesListViewModel(
 
     /** Sets whether a device is enabled for sync. */
     fun setDeviceEnabled(macAddress: String, enabled: Boolean) {
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(ioDispatcher) {
             pairedDevicesRepository.setDeviceEnabled(macAddress, enabled)
 
             // Start service if we just enabled a device AND global sync is enabled
@@ -166,7 +171,7 @@ class DevicesListViewModel(
 
     /** Unpairs (removes) a device. */
     fun unpairDevice(macAddress: String) {
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(ioDispatcher) {
             // First disconnect if connected
             service?.disconnectDevice(macAddress)
 
@@ -177,7 +182,7 @@ class DevicesListViewModel(
 
     /** Retries connection to a failed device. */
     fun retryConnection(macAddress: String) {
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(ioDispatcher) {
             val device = pairedDevicesRepository.getDevice(macAddress) ?: return@launch
             service?.connectDevice(device)
         }
@@ -185,7 +190,7 @@ class DevicesListViewModel(
 
     /** Manually triggers a scan for all enabled but disconnected devices. */
     fun refreshConnections() {
-        viewModelScope.launch(Dispatchers.IO) {
+        viewModelScope.launch(ioDispatcher) {
             pairedDevicesRepository.setSyncEnabled(true)
             val context = bindingContextProvider()
             val intent = MultiDeviceSyncService.createRefreshIntent(context)

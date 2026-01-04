@@ -155,6 +155,7 @@ fun registerNotificationChannel(context: Context) {
             /* importance = */ NotificationManager.IMPORTANCE_MIN,
         )
 
+    @Suppress("UNCHECKED_CAST")
     val notificationManager =
         context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
@@ -165,6 +166,9 @@ fun registerNotificationChannel(context: Context) {
 
 /** Creates a notification for multi-device sync showing connection status. */
 internal fun createMultiDeviceNotification(
+    notificationBuilder: NotificationBuilder,
+    pendingIntentFactory: PendingIntentFactory,
+    intentFactory: IntentFactory,
     context: Context,
     connectedCount: Int,
     totalEnabled: Int,
@@ -209,39 +213,41 @@ internal fun createMultiDeviceNotification(
             else -> R.drawable.ic_sync
         }
 
-    return NotificationCompat.Builder(context, NOTIFICATION_CHANNEL)
-        .setOngoing(true)
-        .setPriority(PRIORITY_LOW)
-        .setCategory(Notification.CATEGORY_LOCATION_SHARING)
-        .setSilent(true)
-        .setContentTitle(title)
-        .setContentText(content)
-        .setSmallIcon(icon)
-        .addAction(
-            NotificationCompat.Action.Builder(
-                    /* icon = */ 0,
-                    /* title = */ "Refresh",
-                    /* intent = */ PendingIntent.getService(
+    val actions =
+        listOf(
+            NotificationAction(
+                icon = 0,
+                title = "Refresh",
+                pendingIntent =
+                    pendingIntentFactory.createServicePendingIntent(
                         context,
                         MultiDeviceSyncService.REFRESH_REQUEST_CODE,
-                        MultiDeviceSyncService.createRefreshIntent(context),
+                        intentFactory.createRefreshIntent(context),
                         PendingIntent.FLAG_IMMUTABLE,
                     ),
-                )
-                .build()
-        )
-        .addAction(
-            NotificationCompat.Action.Builder(
-                    /* icon = */ 0,
-                    /* title = */ "Stop all",
-                    /* intent = */ PendingIntent.getService(
+            ),
+            NotificationAction(
+                icon = 0,
+                title = "Stop all",
+                pendingIntent =
+                    pendingIntentFactory.createServicePendingIntent(
                         context,
                         MultiDeviceSyncService.STOP_REQUEST_CODE,
-                        MultiDeviceSyncService.createStopIntent(context),
+                        intentFactory.createStopIntent(context),
                         PendingIntent.FLAG_IMMUTABLE,
                     ),
-                )
-                .build()
+            ),
         )
-        .build()
+
+    return notificationBuilder.build(
+        channelId = NOTIFICATION_CHANNEL,
+        title = title,
+        content = content,
+        icon = icon,
+        isOngoing = true,
+        priority = PRIORITY_LOW,
+        category = Notification.CATEGORY_LOCATION_SHARING,
+        isSilent = true,
+        actions = actions,
+    )
 }

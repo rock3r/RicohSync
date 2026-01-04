@@ -68,6 +68,57 @@ This is an Android project built with:
 - All repository interfaces have fake implementations in `test/fakes/`
 - Use Khronicle for logging throughout the app (initialized in MainActivity)
 - Kable logging uses KhronicleLogEngine adapter
+- Tests use `TestGraphFactory` to get fake dependencies instead of production implementations
+
+### Dispatcher Injection for Testability
+
+**Always inject dispatchers** into ViewModels and other classes that launch coroutines on `Dispatchers.IO` or `Dispatchers.Default`. This allows tests to control time advancement with `runTest` and `advanceUntilIdle()`.
+
+#### Pattern
+
+```kotlin
+// In the ViewModel/class
+class MyViewModel(
+    private val repository: MyRepository,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO, // Injectable with default
+) : ViewModel() {
+    
+    fun doSomething() {
+        viewModelScope.launch(ioDispatcher) {  // Use injected dispatcher
+            repository.fetchData()
+        }
+    }
+}
+
+// In tests
+@Test
+fun `my test`() = runTest {
+    val testDispatcher = UnconfinedTestDispatcher()
+    val viewModel = MyViewModel(
+        repository = fakeRepository,
+        ioDispatcher = testDispatcher,  // Inject test dispatcher
+    )
+    
+    viewModel.doSomething()
+    advanceUntilIdle()  // Now properly advances virtual time
+    
+    // Assertions...
+}
+```
+
+#### Why This Matters
+
+When using `runTest`, time is virtual. However, coroutines launched on `Dispatchers.IO` use **real time**, causing:
+- `advanceUntilIdle()` to not wait for IO operations
+- Tests to be flaky or require `Thread.sleep()` (which is slow and unreliable)
+
+By injecting the dispatcher, tests can pass `UnconfinedTestDispatcher()` or `StandardTestDispatcher()`, making all coroutines use virtual time.
+
+#### Examples in This Codebase
+
+- `DevicesListViewModel`: Accepts `ioDispatcher` parameter for all `Dispatchers.IO` usages
+- `PairingViewModel`: Same pattern for pairing operations
+- `MultiDeviceSyncCoordinator`: Accepts `CoroutineScope` for complete control in tests
 
 ### Testing Notes
 - Primary test configuration: Pixel 9 + Android 15 + Ricoh GR IIIx

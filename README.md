@@ -88,10 +88,11 @@ No specific environment variables are required for a standard build. Ensure `JAV
 
 ## Technical Stack
 
-- **Language**: [Kotlin](https://kotlinlang.org/) (2.0.0)
+- **Language**: [Kotlin](https://kotlinlang.org/) (2.3.0)
 - **UI Framework**: [Jetpack Compose](https://developer.android.com/compose)
 - **BLE Library**: [Kable](https://github.com/JuulLabs/kable)
 - **Data Persistence**: [DataStore](https://developer.android.com/topic/libraries/architecture/datastore) with [Protocol Buffers](https://developers.google.com/protocol-buffers)
+- **Dependency Injection**: [Metro](https://github.com/ZacSweers/metro) (compile-time DI framework)
 - **Dependency Management**: Gradle Version Catalogs (`libs.versions.toml`)
 
 ## Testing

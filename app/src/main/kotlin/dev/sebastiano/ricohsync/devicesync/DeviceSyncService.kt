@@ -17,9 +17,8 @@ import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
 import com.juul.khronicle.Log
+import dev.sebastiano.ricohsync.RicohSyncApp
 import dev.sebastiano.ricohsync.data.repository.DataStorePairedDevicesRepository
-import dev.sebastiano.ricohsync.data.repository.FusedLocationRepository
-import dev.sebastiano.ricohsync.data.repository.KableCameraRepository
 import dev.sebastiano.ricohsync.data.repository.pairedDevicesDataStoreV2
 import dev.sebastiano.ricohsync.domain.model.RicohCamera
 import dev.sebastiano.ricohsync.domain.model.SyncState
@@ -61,12 +60,10 @@ internal class DeviceSyncService : Service(), CoroutineScope {
     }
 
     private val syncCoordinator by lazy {
+        val appGraph = (applicationContext.applicationContext as RicohSyncApp).appGraph
         SyncCoordinator(
-            cameraRepository =
-                KableCameraRepository(
-                    vendorRegistry = dev.sebastiano.ricohsync.RicohSyncApp.createVendorRegistry()
-                ),
-            locationRepository = FusedLocationRepository(applicationContext),
+            cameraRepository = appGraph.cameraRepository,
+            locationRepository = appGraph.locationRepository,
             pairedDevicesRepository = pairedDevicesRepository,
             coroutineScope = this,
         )

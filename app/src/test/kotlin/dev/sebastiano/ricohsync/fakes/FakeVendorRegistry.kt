@@ -66,8 +66,14 @@ object FakeCameraVendor : CameraVendor {
         )
 
     override fun extractModelFromPairingName(pairingName: String?): String {
-        // For fake vendor, just return the pairing name as-is
-        return pairingName ?: "Unknown"
+        if (pairingName == null) return "Unknown"
+
+        // For fake vendor, if the name ends with a space and number (e.g., "My Camera 1"),
+        // extract the base model name (e.g., "My Camera") to support test scenarios
+        // where multiple devices have the same model but different pairing names
+        val pattern = Regex("^(.+?)\\s+\\d+$")
+        val match = pattern.find(pairingName)
+        return match?.groupValues?.get(1) ?: pairingName
     }
 }
 

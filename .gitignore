@@ -107,3 +107,4 @@ $RECYCLE.BIN/
 # Ignore Kotlin compiler sessions
 /.kotlin
 /buildSrc/.kotlin
+/.vscode/tasks.json

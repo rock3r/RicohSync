@@ -7,9 +7,15 @@ import dev.sebastiano.ricohsync.fakes.FakeKhronicleLogger
 import dev.sebastiano.ricohsync.fakes.FakeLocationRepository
 import dev.sebastiano.ricohsync.fakes.FakePairedDevicesRepository
 import dev.sebastiano.ricohsync.fakes.FakeVendorRegistry
+import io.mockk.every
+import io.mockk.mockk
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -26,9 +32,13 @@ class DevicesListViewModelTest {
     private lateinit var locationRepository: FakeLocationRepository
     private lateinit var vendorRegistry: FakeVendorRegistry
     private lateinit var viewModel: DevicesListViewModel
+    private val testDispatcher = UnconfinedTestDispatcher()
 
     @Before
     fun setUp() {
+        // Set up test dispatcher for Main
+        Dispatchers.setMain(testDispatcher)
+
         // Initialize Khronicle with fake logger for tests
         RicohSyncApp.initializeLogging(FakeKhronicleLogger)
 
@@ -42,12 +52,14 @@ class DevicesListViewModelTest {
                 locationRepository = locationRepository,
                 bindingContextProvider = { mockContext() },
                 vendorRegistry = vendorRegistry,
+                ioDispatcher = testDispatcher, // Inject test dispatcher for IO operations
             )
     }
 
     @After
     fun tearDown() {
-        // Clean up if needed
+        // Reset Main dispatcher
+        Dispatchers.resetMain()
     }
 
     @Test
@@ -64,11 +76,17 @@ class DevicesListViewModelTest {
         advanceUntilIdle()
 
         val state = viewModel.state.value
-        assertTrue(state is DevicesListState.HasDevices)
+        assertTrue(
+            "State should be HasDevices, but was: $state",
+            state is DevicesListState.HasDevices,
+        )
         val hasDevicesState = state as DevicesListState.HasDevices
 
         val displayInfo = hasDevicesState.displayInfoMap[device.macAddress]
-        assertNotNull(displayInfo)
+        assertNotNull(
+            "Display info should not be null for device ${device.macAddress}",
+            displayInfo,
+        )
         assertEquals("Fake Camera", displayInfo!!.make)
         assertEquals("GR IIIx", displayInfo.model)
         assertFalse(displayInfo.showPairingName)
@@ -248,45 +266,26 @@ class DevicesListViewModelTest {
         }
 
     private fun mockContext(): Context {
-        // Return a minimal mock context that won't crash
+        // Return a relaxed mock context that won't crash
         // The service binding will fail, but that's fine for these tests
         // since we're only testing display info computation
-        return object : Context() {
-            override fun getApplicationContext(): Context = this
-
-            override fun getPackageName(): String = "test.package"
-
-            override fun getSystemService(name: String): Any? = null
-
-            override fun getResources() = throw UnsupportedOperationException()
-
-            override fun getAssets() = throw UnsupportedOperationException()
-
-            override fun getTheme() = throw UnsupportedOperationException()
-
-            override fun getClassLoader() = throw UnsupportedOperationException()
-
-            override fun getPackageManager() = throw UnsupportedOperationException()
-
-            override fun getContentResolver() = throw UnsupportedOperationException()
-
-            override fun getMainLooper() = throw UnsupportedOperationException()
-
-            override fun getMainExecutor() = throw UnsupportedOperationException()
-
-            override fun bindService(
-                service: android.content.Intent?,
-                conn: android.content.ServiceConnection?,
-                flags: Int,
-            ): Boolean = false // Return false to indicate binding failed (expected in tests)
-
-            override fun unbindService(conn: android.content.ServiceConnection?) {
-                // No-op
-            }
-
-            override fun startService(
-                service: android.content.Intent?
-            ): android.content.ComponentName? = null
+        return mockk<Context>(relaxed = true) {
+            every { applicationContext } returns this
+            every { packageName } returns "test.package"
+            every {
+                bindService(
+                    any<android.content.Intent>(),
+                    any<android.content.ServiceConnection>(),
+                    any<Int>(),
+                )
+            } returns false
+            every {
+                bindService(
+                    any<android.content.Intent>(),
+                    any<android.content.ServiceConnection>(),
+                    any<android.content.Context.BindServiceFlags>(),
+                )
+            } returns false
         }
     }
 }

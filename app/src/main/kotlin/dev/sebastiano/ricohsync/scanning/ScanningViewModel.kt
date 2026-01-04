@@ -12,7 +12,6 @@ import com.juul.kable.PlatformAdvertisement
 import com.juul.kable.Scanner
 import com.juul.kable.logs.Logging
 import com.juul.khronicle.Log
-import dev.sebastiano.ricohsync.RicohSyncApp
 import dev.sebastiano.ricohsync.domain.model.Camera
 import dev.sebastiano.ricohsync.domain.vendor.CameraVendorRegistry
 import dev.sebastiano.ricohsync.logging.KhronicleLogEngine
@@ -35,14 +34,12 @@ private const val TAG = "ScanningViewModel"
  * multiple camera vendors through the camera vendor registry.
  */
 @OptIn(ExperimentalUuidApi::class)
-internal class ScanningViewModel : ViewModel() {
+internal class ScanningViewModel(private val vendorRegistry: CameraVendorRegistry) : ViewModel() {
 
     private val _state = mutableStateOf<PairingState>(PairingState.Loading)
     val state: State<PairingState> = _state
 
     private var scanJob: Job? = null
-
-    private val vendorRegistry: CameraVendorRegistry = RicohSyncApp.createVendorRegistry()
 
     @OptIn(ObsoleteKableApi::class)
     private val scanner = Scanner {

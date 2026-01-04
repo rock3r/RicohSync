@@ -18,6 +18,7 @@ lifecycleProcess = "2.10.0"
 maplibre = "0.12.1"
 maplibre-spatialk = "0.6.0"
 mockk = "1.14.7"
+metro = "0.9.2"
 navigation3 = "1.0.0"
 protobufPlugin = "0.9.6"
 protobuf = "4.33.2"
@@ -61,5 +62,6 @@ protobuf-protoc = { group = "com.google.protobuf", name = "protoc", version.ref 
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+metro = { id = "dev.zacsweers.metro", version.ref = "metro" }
 protobuf = { id = "com.google.protobuf", version.ref = "protobufPlugin" }
 ktfmt = { id = "com.ncorti.ktfmt.gradle", version.ref = "ktfmt" }

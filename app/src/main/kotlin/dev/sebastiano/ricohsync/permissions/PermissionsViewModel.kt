@@ -40,8 +40,11 @@ class PermissionsViewModel : ViewModel() {
     /** Checks if all permissions in the list are granted and triggers the animation if so. */
     fun checkPermissions(permissions: List<PermissionInfo>) {
         val allGranted = permissions.all { it.isGranted }
-        if (allGranted && !_showSuccessAnimation.value) {
-            onAllPermissionsGranted()
+        if (allGranted) {
+            if (!_showSuccessAnimation.value) {
+                _showSuccessAnimation.value = true
+            }
+            triggerNavigationAfterDelay()
         }
     }
 

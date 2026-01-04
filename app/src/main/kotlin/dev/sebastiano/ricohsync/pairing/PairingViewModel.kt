@@ -11,12 +11,12 @@ import com.juul.kable.Scanner
 import com.juul.kable.logs.LogEngine
 import com.juul.kable.logs.Logging
 import com.juul.khronicle.Log
-import dev.sebastiano.ricohsync.RicohSyncApp
 import dev.sebastiano.ricohsync.domain.model.Camera
 import dev.sebastiano.ricohsync.domain.repository.PairedDevicesRepository
 import dev.sebastiano.ricohsync.domain.vendor.CameraVendorRegistry
 import dev.sebastiano.ricohsync.logging.KhronicleLogEngine
 import kotlin.uuid.ExperimentalUuidApi
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
@@ -38,10 +38,16 @@ private const val TAG = "PairingViewModel"
  * Manages BLE scanning for supported cameras and handles the pairing process. Excludes
  * already-paired devices from the scan results.
  */
+/**
+ * @param ioDispatcher The dispatcher to use for IO operations. Defaults to [Dispatchers.IO]. Can be
+ *   overridden in tests to use a test dispatcher.
+ */
 @OptIn(ExperimentalUuidApi::class)
 class PairingViewModel(
     private val pairedDevicesRepository: PairedDevicesRepository,
+    private val vendorRegistry: CameraVendorRegistry,
     private val loggingEngine: LogEngine = KhronicleLogEngine,
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : ViewModel() {
 
     private val _state = mutableStateOf<PairingScreenState>(PairingScreenState.Idle)
@@ -52,8 +58,6 @@ class PairingViewModel(
 
     private var scanJob: Job? = null
     private var pairingJob: Job? = null
-
-    private val vendorRegistry: CameraVendorRegistry = RicohSyncApp.createVendorRegistry()
 
     @OptIn(ObsoleteKableApi::class)
     private val scanner: Scanner<PlatformAdvertisement>? =
@@ -100,7 +104,7 @@ class PairingViewModel(
                 .onEach { advertisement -> onDiscovery(advertisement) }
                 .onStart { Log.info(tag = TAG) { "BLE scan started" } }
                 .onCompletion { Log.info(tag = TAG) { "BLE scan completed" } }
-                .flowOn(Dispatchers.IO)
+                .flowOn(ioDispatcher)
                 .launchIn(viewModelScope)
     }
 
@@ -142,7 +146,7 @@ class PairingViewModel(
         _state.value = PairingScreenState.Pairing(camera)
 
         pairingJob =
-            viewModelScope.launch(Dispatchers.IO) {
+            viewModelScope.launch(ioDispatcher) {
                 try {
                     // Add device to repository (this is the "pairing" - we store the device)
                     // The actual BLE connection will happen when the device is enabled

@@ -6,14 +6,17 @@ import dev.sebastiano.ricohsync.fakes.FakeCameraVendor
 import dev.sebastiano.ricohsync.fakes.FakeKhronicleLogger
 import dev.sebastiano.ricohsync.fakes.FakeLoggingEngine
 import dev.sebastiano.ricohsync.fakes.FakePairedDevicesRepository
+import dev.sebastiano.ricohsync.fakes.FakeVendorRegistry
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.setMain
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -27,6 +30,7 @@ class PairingViewModelTest {
 
     private lateinit var pairedDevicesRepository: FakePairedDevicesRepository
     private lateinit var viewModel: PairingViewModel
+    private val testDispatcher = UnconfinedTestDispatcher()
 
     private val testCamera =
         Camera(
@@ -38,15 +42,28 @@ class PairingViewModelTest {
 
     @Before
     fun setUp() {
+        // Set up test dispatchers
+        Dispatchers.setMain(testDispatcher)
+
         // Initialize Khronicle with fake logger for tests
         RicohSyncApp.initializeLogging(FakeKhronicleLogger)
 
         pairedDevicesRepository = FakePairedDevicesRepository()
+        val vendorRegistry = FakeVendorRegistry()
         // Inject FakeLoggingEngine instead of using KhronicleLogEngine
-        viewModel = PairingViewModel(pairedDevicesRepository, loggingEngine = FakeLoggingEngine)
+        viewModel =
+            PairingViewModel(
+                pairedDevicesRepository = pairedDevicesRepository,
+                vendorRegistry = vendorRegistry,
+                loggingEngine = FakeLoggingEngine,
+                ioDispatcher = testDispatcher, // Inject test dispatcher
+            )
     }
 
-    @After fun tearDown() {}
+    @After
+    fun tearDown() {
+        Dispatchers.resetMain()
+    }
 
     @Test
     fun `initial state is Idle`() {
@@ -60,7 +77,7 @@ class PairingViewModelTest {
         val state = viewModel.state.value
         assertTrue(state is PairingScreenState.Pairing)
         assertEquals(testCamera, (state as PairingScreenState.Pairing).camera)
-        assertNull((state as PairingScreenState.Pairing).error)
+        assertNull(state.error)
     }
 
     @Test
@@ -84,13 +101,7 @@ class PairingViewModelTest {
         assertFalse(pairedDevicesRepository.addDeviceCalled)
 
         viewModel.pairDevice(testCamera)
-
-        // Wait for the pairing coroutine to complete (it runs on IO dispatcher)
-        var attempts = 0
-        while (!pairedDevicesRepository.addDeviceCalled && attempts < 50) {
-            kotlinx.coroutines.delay(10)
-            attempts++
-        }
+        advanceUntilIdle()
 
         assertTrue(pairedDevicesRepository.addDeviceCalled)
         assertEquals(testCamera, pairedDevicesRepository.lastAddedCamera)
@@ -104,8 +115,9 @@ class PairingViewModelTest {
         pairedDevicesRepository.addDeviceException = exception
 
         viewModel.pairDevice(testCamera)
+        advanceUntilIdle()
 
-        // Wait for error to be set (it runs on IO dispatcher)
+        // Wait for the error to be set (it runs on IO dispatcher)
         var attempts = 0
         while (attempts < 50) {
             val state = viewModel.state.value
@@ -113,10 +125,10 @@ class PairingViewModelTest {
                 assertEquals(PairingError.REJECTED, state.error)
                 return@runTest
             }
-            kotlinx.coroutines.delay(10)
+            delay(10)
             attempts++
         }
-        // If we get here, the error wasn't set
+
         val state = viewModel.state.value
         assertTrue(state is PairingScreenState.Pairing)
         val pairingState = state as PairingScreenState.Pairing
@@ -130,8 +142,9 @@ class PairingViewModelTest {
         pairedDevicesRepository.addDeviceException = exception
 
         viewModel.pairDevice(testCamera)
+        advanceUntilIdle()
 
-        // Wait for error to be set (it runs on IO dispatcher)
+        // Wait for the error to be set (it runs on IO dispatcher)
         var attempts = 0
         while (attempts < 50) {
             val state = viewModel.state.value
@@ -139,10 +152,10 @@ class PairingViewModelTest {
                 assertEquals(PairingError.TIMEOUT, state.error)
                 return@runTest
             }
-            kotlinx.coroutines.delay(10)
+            delay(10)
             attempts++
         }
-        // If we get here, the error wasn't set
+
         val state = viewModel.state.value
         assertTrue(state is PairingScreenState.Pairing)
         val pairingState = state as PairingScreenState.Pairing
@@ -156,8 +169,9 @@ class PairingViewModelTest {
         pairedDevicesRepository.addDeviceException = exception
 
         viewModel.pairDevice(testCamera)
+        advanceUntilIdle()
 
-        // Wait for error to be set (it runs on IO dispatcher)
+        // Wait for the error to be set (it runs on IO dispatcher)
         var attempts = 0
         while (attempts < 50) {
             val state = viewModel.state.value
@@ -165,10 +179,10 @@ class PairingViewModelTest {
                 assertEquals(PairingError.UNKNOWN, state.error)
                 return@runTest
             }
-            kotlinx.coroutines.delay(10)
+            delay(10)
             attempts++
         }
-        // If we get here, the error wasn't set
+
         val state = viewModel.state.value
         assertTrue(state is PairingScreenState.Pairing)
         val pairingState = state as PairingScreenState.Pairing
@@ -186,7 +200,7 @@ class PairingViewModelTest {
         val job = launch {
             try {
                 viewModel.navigationEvents.take(1).collect { events.add(it) }
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 // Ignore timeout
             }
         }
@@ -194,8 +208,6 @@ class PairingViewModelTest {
         viewModel.pairDevice(testCamera)
         advanceUntilIdle()
 
-        // Give a small delay to see if any events are emitted
-        delay(100)
         job.cancel()
 
         // No events should be emitted on error
@@ -257,20 +269,14 @@ class PairingViewModelTest {
 
         // First pairing
         viewModel.pairDevice(testCamera)
-        var attempts = 0
-        while (events.isEmpty() && attempts < 50) {
-            kotlinx.coroutines.delay(10)
-            attempts++
-        }
+        advanceUntilIdle()
+
+        // Ensure first event was received before starting second pairing
+        assertEquals("First pairing should emit an event", 1, events.size)
 
         // Second pairing (repository allows updating existing devices)
         viewModel.pairDevice(testCamera)
-        attempts = 0
-        val firstEventCount = events.size
-        while (events.size == firstEventCount && attempts < 50) {
-            kotlinx.coroutines.delay(10)
-            attempts++
-        }
+        advanceUntilIdle()
 
         job.cancel()
 

@@ -293,6 +293,11 @@ All key interfaces have fake implementations for testing:
 | `CameraConnection` | `FakeCameraConnection` |
 | `LocationRepository` | `FakeLocationRepository` |
 | `CameraVendorRegistry` | `FakeVendorRegistry` |
+| `NotificationBuilder` | `FakeNotificationBuilder` |
+| `IntentFactory` | `FakeIntentFactory` |
+| `PendingIntentFactory` | `FakePendingIntentFactory` |
+
+**Dependency Injection**: The project uses Metro for compile-time DI. Tests use `TestGraphFactory` to access fake dependencies, while production code uses `AppGraphFactory`. This allows for clean separation between test and production implementations without requiring Robolectric or extensive Android framework mocking.
 
 ### Test Structure
 
@@ -304,11 +309,17 @@ app/src/test/kotlin/dev/sebastiano/ricohsync/
 │   ├── FakeCameraRepository.kt
 │   ├── FakeCameraConnection.kt
 │   ├── FakeLocationRepository.kt
-│   └── FakeVendorRegistry.kt
+│   ├── FakeVendorRegistry.kt
+│   ├── FakeNotificationBuilder.kt
+│   ├── FakeIntentFactory.kt
+│   └── FakePendingIntentFactory.kt
+├── di/
+│   └── TestModule.kt (Metro test dependency graph)
 ├── devicesync/
 │   ├── MultiDeviceSyncCoordinatorTest.kt
 │   ├── DefaultLocationCollectorTest.kt
-│   └── SyncCoordinatorTest.kt
+│   ├── SyncCoordinatorTest.kt
+│   └── NotificationsTest.kt
 └── data/repository/
     └── FakePairedDevicesRepositoryTest.kt
 ```
