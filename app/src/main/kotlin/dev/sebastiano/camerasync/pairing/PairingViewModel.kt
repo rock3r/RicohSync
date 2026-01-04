@@ -21,6 +21,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.launchIn
@@ -46,6 +47,7 @@ private const val TAG = "PairingViewModel"
 class PairingViewModel(
     private val pairedDevicesRepository: PairedDevicesRepository,
     private val vendorRegistry: CameraVendorRegistry,
+    private val bluetoothBondingChecker: BluetoothBondingChecker,
     private val loggingEngine: LogEngine = KhronicleLogEngine,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : ViewModel() {
@@ -143,10 +145,20 @@ class PairingViewModel(
     /** Starts pairing with the selected camera. */
     fun pairDevice(camera: Camera) {
         stopScanning()
-        _state.value = PairingScreenState.Pairing(camera)
 
         pairingJob =
             viewModelScope.launch(ioDispatcher) {
+                // Check if device is already bonded at system level
+                if (bluetoothBondingChecker.isDeviceBonded(camera.macAddress)) {
+                    Log.warn(tag = TAG) {
+                        "Device ${camera.macAddress} is already bonded at system level"
+                    }
+                    _state.value = PairingScreenState.AlreadyBonded(camera)
+                    return@launch
+                }
+
+                _state.value = PairingScreenState.Pairing(camera)
+
                 try {
                     // Add device to repository (this is the "pairing" - we store the device)
                     // The actual BLE connection will happen when the device is enabled
@@ -168,6 +180,28 @@ class PairingViewModel(
                             else -> PairingError.UNKNOWN
                         }
                     _state.value = PairingScreenState.Pairing(camera, error = error)
+                }
+            }
+    }
+
+    /** Removes the system-level bond and retries pairing. */
+    fun removeBondAndRetry(camera: Camera) {
+        pairingJob =
+            viewModelScope.launch(ioDispatcher) {
+                val removed = bluetoothBondingChecker.removeBond(camera.macAddress)
+                if (removed) {
+                    Log.info(tag = TAG) {
+                        "Bond removed for ${camera.macAddress}, retrying pairing"
+                    }
+                    // Wait a moment for the system to process the unbond
+                    delay(500)
+                    // Retry pairing
+                    pairDevice(camera)
+                } else {
+                    Log.warn(tag = TAG) {
+                        "Failed to remove bond for ${camera.macAddress}, showing manual instructions"
+                    }
+                    _state.value = PairingScreenState.AlreadyBonded(camera, removeFailed = true)
                 }
             }
     }
@@ -212,6 +246,10 @@ sealed interface PairingScreenState {
 
     /** Actively scanning for cameras. */
     data class Scanning(val discoveredDevices: List<Camera>, val isScanning: Boolean = true) :
+        PairingScreenState
+
+    /** Device is already bonded at system level. */
+    data class AlreadyBonded(val camera: Camera, val removeFailed: Boolean = false) :
         PairingScreenState
 
     /** Pairing with a selected camera. */

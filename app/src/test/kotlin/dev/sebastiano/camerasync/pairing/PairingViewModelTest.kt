@@ -2,6 +2,7 @@ package dev.sebastiano.camerasync.pairing
 
 import dev.sebastiano.camerasync.CameraSyncApp
 import dev.sebastiano.camerasync.domain.model.Camera
+import dev.sebastiano.camerasync.fakes.FakeBluetoothBondingChecker
 import dev.sebastiano.camerasync.fakes.FakeCameraVendor
 import dev.sebastiano.camerasync.fakes.FakeKhronicleLogger
 import dev.sebastiano.camerasync.fakes.FakeLoggingEngine
@@ -29,6 +30,7 @@ import org.junit.Test
 class PairingViewModelTest {
 
     private lateinit var pairedDevicesRepository: FakePairedDevicesRepository
+    private lateinit var bluetoothBondingChecker: FakeBluetoothBondingChecker
     private lateinit var viewModel: PairingViewModel
     private val testDispatcher = UnconfinedTestDispatcher()
 
@@ -49,12 +51,14 @@ class PairingViewModelTest {
         CameraSyncApp.initializeLogging(FakeKhronicleLogger)
 
         pairedDevicesRepository = FakePairedDevicesRepository()
+        bluetoothBondingChecker = FakeBluetoothBondingChecker()
         val vendorRegistry = FakeVendorRegistry()
         // Inject FakeLoggingEngine instead of using KhronicleLogEngine
         viewModel =
             PairingViewModel(
                 pairedDevicesRepository = pairedDevicesRepository,
                 vendorRegistry = vendorRegistry,
+                bluetoothBondingChecker = bluetoothBondingChecker,
                 loggingEngine = FakeLoggingEngine,
                 ioDispatcher = testDispatcher, // Inject test dispatcher
             )
@@ -258,6 +262,59 @@ class PairingViewModelTest {
         val state = viewModel.state.value
         assertTrue(state is PairingScreenState.Pairing)
         assertFalse(state is PairingScreenState.Scanning)
+    }
+
+    @Test
+    fun `pairDevice transitions to AlreadyBonded when device is bonded at system level`() =
+        runTest {
+            bluetoothBondingChecker.setBonded(testCamera.macAddress, bonded = true)
+
+            viewModel.pairDevice(testCamera)
+            advanceUntilIdle()
+
+            val state = viewModel.state.value
+            assertTrue(state is PairingScreenState.AlreadyBonded)
+            assertEquals(testCamera, (state as PairingScreenState.AlreadyBonded).camera)
+            assertFalse(state.removeFailed)
+        }
+
+    @Test
+    fun `removeBondAndRetry removes bond and retries pairing`() = runTest {
+        bluetoothBondingChecker.setBonded(testCamera.macAddress, bonded = true)
+
+        viewModel.pairDevice(testCamera)
+        advanceUntilIdle()
+
+        // Should be in AlreadyBonded state
+        assertTrue(viewModel.state.value is PairingScreenState.AlreadyBonded)
+
+        // Remove bond and retry
+        viewModel.removeBondAndRetry(testCamera)
+        advanceUntilIdle()
+
+        // Should transition to Pairing state and eventually succeed
+        val state = viewModel.state.value
+        assertTrue(state is PairingScreenState.Pairing)
+        assertTrue(pairedDevicesRepository.isDevicePaired(testCamera.macAddress))
+    }
+
+    @Test
+    fun `removeBondAndRetry shows removeFailed when bond removal fails`() = runTest {
+        bluetoothBondingChecker.setBonded(testCamera.macAddress, bonded = true)
+
+        viewModel.pairDevice(testCamera)
+        advanceUntilIdle()
+
+        // Manually remove the bond to simulate removal failure
+        bluetoothBondingChecker.setBonded(testCamera.macAddress, bonded = false)
+
+        // Now removeBondAndRetry will fail because device is no longer bonded
+        viewModel.removeBondAndRetry(testCamera)
+        advanceUntilIdle()
+
+        val state = viewModel.state.value
+        assertTrue(state is PairingScreenState.AlreadyBonded)
+        assertTrue((state as PairingScreenState.AlreadyBonded).removeFailed)
     }
 
     @Test

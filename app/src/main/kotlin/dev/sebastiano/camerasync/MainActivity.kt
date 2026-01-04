@@ -122,6 +122,7 @@ private fun RootComposable(appGraph: AppGraph, context: Context) {
                             PairingViewModel(
                                 pairedDevicesRepository = pairedDevicesRepository,
                                 vendorRegistry = vendorRegistry,
+                                bluetoothBondingChecker = appGraph.bluetoothBondingChecker,
                             )
                         }
 

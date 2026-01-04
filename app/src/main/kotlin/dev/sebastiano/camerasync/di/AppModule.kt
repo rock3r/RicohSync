@@ -19,6 +19,8 @@ import dev.sebastiano.camerasync.domain.repository.LocationRepository
 import dev.sebastiano.camerasync.domain.repository.PairedDevicesRepository
 import dev.sebastiano.camerasync.domain.vendor.CameraVendorRegistry
 import dev.sebastiano.camerasync.domain.vendor.DefaultCameraVendorRegistry
+import dev.sebastiano.camerasync.pairing.AndroidBluetoothBondingChecker
+import dev.sebastiano.camerasync.pairing.BluetoothBondingChecker
 import dev.sebastiano.camerasync.vendors.ricoh.RicohCameraVendor
 import dev.sebastiano.camerasync.vendors.sony.SonyCameraVendor
 import dev.zacsweers.metro.DependencyGraph
@@ -41,6 +43,7 @@ interface AppGraph {
     val pairedDevicesRepository: PairedDevicesRepository
     val locationRepository: LocationRepository
     val cameraRepository: CameraRepository
+    val bluetoothBondingChecker: BluetoothBondingChecker
 
     @Provides fun provideApplicationContext(application: Application): Context = application
 
@@ -101,6 +104,10 @@ interface AppGraph {
 
     @Provides
     fun providePendingIntentFactory(): PendingIntentFactory = AndroidPendingIntentFactory()
+
+    @Provides
+    fun provideBluetoothBondingChecker(context: Context): BluetoothBondingChecker =
+        AndroidBluetoothBondingChecker(context)
 
     @DependencyGraph.Factory
     interface Factory {

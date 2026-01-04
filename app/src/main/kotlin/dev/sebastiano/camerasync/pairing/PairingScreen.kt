@@ -36,7 +36,9 @@ import androidx.compose.material.icons.rounded.Bluetooth
 import androidx.compose.material.icons.rounded.CameraAlt
 import androidx.compose.material.icons.rounded.Error
 import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Stop
+import androidx.compose.material3.Button
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
@@ -137,6 +139,16 @@ fun PairingScreen(
                         discoveredDevices = currentState.discoveredDevices,
                         isScanning = currentState.isScanning,
                         onDeviceClick = { camera -> viewModel.pairDevice(camera) },
+                    )
+                }
+
+                is PairingScreenState.AlreadyBonded -> {
+                    AlreadyBondedContent(
+                        modifier = Modifier.fillMaxSize(),
+                        camera = currentState.camera,
+                        removeFailed = currentState.removeFailed,
+                        onRemoveBond = { viewModel.removeBondAndRetry(currentState.camera) },
+                        onCancel = { viewModel.cancelPairing() },
                     )
                 }
 
@@ -350,6 +362,71 @@ private fun DeviceInfoColumn(camera: Camera, modifier: Modifier = Modifier) {
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
         )
+    }
+}
+
+@Composable
+private fun AlreadyBondedContent(
+    modifier: Modifier = Modifier,
+    camera: Camera,
+    removeFailed: Boolean,
+    onRemoveBond: () -> Unit,
+    onCancel: () -> Unit,
+) {
+    Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.padding(32.dp),
+        ) {
+            Icon(
+                Icons.Rounded.Settings,
+                contentDescription = null,
+                modifier = Modifier.size(64.dp),
+                tint = MaterialTheme.colorScheme.primary,
+            )
+
+            Spacer(Modifier.height(24.dp))
+
+            Text(
+                "Camera Already Paired",
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold,
+            )
+
+            Spacer(Modifier.height(12.dp))
+
+            Text(
+                text =
+                    if (removeFailed) {
+                        "This camera is already paired to your phone at the system level. " +
+                            "Please remove the existing pairing from your phone's Bluetooth settings, " +
+                            "then try again."
+                    } else {
+                        "This camera is already paired to your phone at the system level. " +
+                            "This can interfere with the app's connection. " +
+                            "Would you like to remove the existing pairing?"
+                    },
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+            )
+
+            Spacer(Modifier.height(32.dp))
+
+            Row {
+                TextButton(onClick = onCancel) { Text("Cancel") }
+
+                Spacer(Modifier.width(16.dp))
+
+                if (!removeFailed) {
+                    Button(onClick = onRemoveBond) {
+                        Text("Remove Pairing", fontWeight = FontWeight.SemiBold)
+                    }
+                } else {
+                    TextButton(onClick = onCancel) { Text("OK", fontWeight = FontWeight.SemiBold) }
+                }
+            }
+        }
     }
 }
 
