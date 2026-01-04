@@ -1,8 +1,8 @@
-# RicohSync - Claude AI Assistant Guide
+# CameraSync - Claude AI Assistant Guide
 
 ## Project Overview
 
-RicohSync is an Android application that synchronizes GPS data and date/time from your Android phone to your camera via Bluetooth Low Energy (BLE). The app supports cameras from multiple vendors (Ricoh, Sony, etc.) and can sync to **multiple cameras simultaneously** in the background.
+CameraSync is an Android application that synchronizes GPS data and date/time from your Android phone to your camera via Bluetooth Low Energy (BLE). The app supports cameras from multiple vendors (Ricoh, Sony, etc.) and can sync to **multiple cameras simultaneously** in the background.
 
 ## Project Structure
 

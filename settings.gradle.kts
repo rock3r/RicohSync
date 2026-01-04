@@ -19,6 +19,6 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "RicohSync"
+rootProject.name = "CameraSync"
 include(":app")
  

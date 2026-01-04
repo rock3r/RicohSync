@@ -1,6 +1,6 @@
 # Multi-Vendor Camera Support
 
-This document describes the refactoring that enables RicohSync to support cameras from multiple manufacturers, not just Ricoh.
+This document describes the refactoring that enables CameraSync to support cameras from multiple manufacturers, not just Ricoh.
 
 ## Architecture Overview
 
@@ -28,7 +28,7 @@ The refactoring introduces a vendor abstraction layer using the **Strategy Patte
 ## Directory Structure
 
 ```
-app/src/main/kotlin/dev/sebastiano/ricohsync/
+app/src/main/kotlin/dev/sebastiano/camerasync/
 ├── domain/
 │   ├── model/
 │   │   ├── Camera.kt (formerly RicohCamera.kt)
@@ -47,7 +47,7 @@ app/src/main/kotlin/dev/sebastiano/ricohsync/
 ├── data/
 │   └── repository/
 │       └── KableCameraRepository.kt (vendor-agnostic)
-└── RicohSyncApp.kt (vendor registry configuration)
+└── CameraSyncApp.kt (vendor registry configuration)
 ```
 
 ## Adding Support for a New Camera Vendor
@@ -56,7 +56,7 @@ Follow these steps to add support for a new camera brand (e.g., Canon, Nikon, So
 
 ### Step 1: Create Vendor Package
 
-Create a new package: `app/src/main/kotlin/dev/sebastiano/ricohsync/vendors/[vendor-name]/`
+Create a new package: `app/src/main/kotlin/dev/sebastiano/camerasync/vendors/[vendor-name]/`
 
 ### Step 2: Implement GATT Specification
 
@@ -156,7 +156,7 @@ object CanonCameraVendor : CameraVendor {
 
 ### Step 5: Register Vendor
 
-Update `RicohSyncApp.kt` to register the new vendor:
+Update `CameraSyncApp.kt` to register the new vendor:
 
 ```kotlin
 fun createVendorRegistry(): CameraVendorRegistry {
@@ -219,7 +219,7 @@ Different vendors support different features. The `CameraCapabilities` class def
 ## Testing a New Vendor
 
 1. Implement the vendor classes as described above
-2. Add unit tests in `app/src/test/kotlin/dev/sebastiano/ricohsync/vendors/[vendor-name]/`
+2. Add unit tests in `app/src/test/kotlin/dev/sebastiano/camerasync/vendors/[vendor-name]/`
 3. Test protocol encoding/decoding with known byte sequences
 4. Test device recognition with various device names and service UUIDs
 5. Test with actual hardware if available

@@ -1,8 +1,8 @@
-# RicohSync
+# CameraSync
 
 A simple Android application that synchronizes GPS data and date/time from your Android phone to your camera via Bluetooth Low Energy (BLE).
 
-While originally built for Ricoh cameras, the app now supports a multi-vendor architecture, allowing it to be extended to other camera brands.
+The app supports a multi-vendor architecture, allowing it to work with cameras from various manufacturers (Ricoh, Sony, etc.).
 
 The app allows you to select your camera from nearby BLE devices on the first start. Once paired, it automatically reconnects and maintains synchronization in the background whenever the camera's Bluetooth is active.
 
@@ -40,8 +40,8 @@ For more details on how to add support for new vendors, see [MULTI_VENDOR_SUPPOR
 
 1. **Clone the repository**:
    ```bash
-   git clone https://github.com/yourusername/RicohSync.git
-   cd RicohSync
+   git clone https://github.com/yourusername/CameraSync.git
+   cd CameraSync
    ```
 
 2. **Open in Android Studio**:

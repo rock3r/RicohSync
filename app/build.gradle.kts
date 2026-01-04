@@ -8,11 +8,11 @@ plugins {
 }
 
 android {
-    namespace = "dev.sebastiano.ricohsync"
+    namespace = "dev.sebastiano.camerasync"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "dev.sebastiano.ricohsync"
+        applicationId = "dev.sebastiano.camerasync"
         minSdk = 33
         targetSdk = 36
         versionCode = 1

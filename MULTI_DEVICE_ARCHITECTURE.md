@@ -1,6 +1,6 @@
 # Multi-Device Architecture
 
-This document describes the architecture that enables RicohSync to manage multiple paired cameras simultaneously, with centralized location collection and independent device connection lifecycle.
+This document describes the architecture that enables CameraSync to manage multiple paired cameras simultaneously, with centralized location collection and independent device connection lifecycle.
 
 ## Architecture Overview
 
@@ -302,7 +302,7 @@ All key interfaces have fake implementations for testing:
 ### Test Structure
 
 ```
-app/src/test/kotlin/dev/sebastiano/ricohsync/
+app/src/test/kotlin/dev/sebastiano/camerasync/
 ├── fakes/
 │   ├── FakePairedDevicesRepository.kt
 │   ├── FakeLocationCollector.kt

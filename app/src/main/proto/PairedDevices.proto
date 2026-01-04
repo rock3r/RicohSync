@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-option java_package = "dev.sebastiano.ricohsync.proto";
+option java_package = "dev.sebastiano.camerasync.proto";
 option java_multiple_files = true;
 
 // Represents a single paired camera device
