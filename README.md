@@ -1,4 +1,4 @@
-# RicohSync
+# CameraSync
 
 A simple Android application that synchronizes GPS data and date/time from your Android phone to your camera via Bluetooth Low Energy (BLE).
 
@@ -13,6 +13,12 @@ The app allows you to select your camera from nearby BLE devices on the first st
 - **Auto-reconnection**: Automatically reconnects to paired cameras when they are within range.
 - **Background Operation**: Continues to sync even when the app is backgrounded (using a foreground service).
 - **Material 3 UI**: Modern and clean interface built with Jetpack Compose.
+
+## Supported cameras
+- Sony Alpha cameras (tested with Alpha 7 Mk 4, but all other modern Alpha cameras with BLE support should work)
+- Ricoh GR III/IIIx (tested with GR IIIx, but other Ricoh models could also work)
+
+Let me know if you manage to use the app with other camera models so I can add them to the list.
 
 ## Requirements
 
@@ -106,7 +112,7 @@ Run unit tests:
 
 ## License
 
-Copyright 2024 Sebastiano Poggi
+Copyright 2026 Sebastiano Poggi
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
