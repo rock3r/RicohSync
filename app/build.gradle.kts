@@ -18,7 +18,11 @@ val keystoreProperties =
         if (keystorePropertiesFile.isFile) {
             load(FileInputStream(keystorePropertiesFile))
         } else {
-            logger.warn("Release signing configuration not provided")
+            // Fallback to environment variables for CI
+            setProperty("keyAlias", System.getenv("RELEASE_KEY_ALIAS"))
+            setProperty("keyPassword", System.getenv("RELEASE_KEY_PASSWORD"))
+            setProperty("storeFile", System.getenv("RELEASE_STORE_FILE"))
+            setProperty("storePassword", System.getenv("RELEASE_STORE_PASSWORD"))
         }
     }
 
@@ -31,11 +35,11 @@ android {
         minSdk = 33
         targetSdk = 36
         versionCode = 1
-        versionName = "1.0"
+        versionName = "1.0.0"
     }
 
     signingConfigs {
-        if (!keystoreProperties.isEmpty) {
+        if (keystoreProperties["storeFile"] != null) {
             create("release") {
                 keyAlias = keystoreProperties["keyAlias"] as String
                 keyPassword = keystoreProperties["keyPassword"] as String
@@ -49,7 +53,7 @@ android {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
-            if (!keystoreProperties.isEmpty) {
+            if (signingConfigs.findByName("release") != null) {
                 signingConfig = signingConfigs.getByName("release")
             }
             proguardFiles(
