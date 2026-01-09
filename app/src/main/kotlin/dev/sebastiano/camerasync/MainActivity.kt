@@ -108,6 +108,7 @@ private fun RootComposable(appGraph: AppGraph, context: Context) {
                                 locationRepository = locationRepository,
                                 bindingContextProvider = { context.applicationContext },
                                 vendorRegistry = vendorRegistry,
+                                bluetoothBondingChecker = appGraph.bluetoothBondingChecker,
                             )
                         }
 
@@ -121,6 +122,7 @@ private fun RootComposable(appGraph: AppGraph, context: Context) {
                         val pairingViewModel = remember {
                             PairingViewModel(
                                 pairedDevicesRepository = pairedDevicesRepository,
+                                cameraRepository = appGraph.cameraRepository,
                                 vendorRegistry = vendorRegistry,
                                 bluetoothBondingChecker = appGraph.bluetoothBondingChecker,
                             )

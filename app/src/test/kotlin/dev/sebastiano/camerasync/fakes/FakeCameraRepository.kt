@@ -31,6 +31,12 @@ class FakeCameraRepository : CameraRepository {
     var connectCallCount = 0
         private set
 
+    /**
+     * Callback invoked after a successful connect() call. Useful for simulating OS-level bonding
+     * after BLE connection.
+     */
+    var onConnectSuccess: ((Camera) -> Unit)? = null
+
     override fun startScanning() {
         startScanningCalled = true
     }
@@ -51,7 +57,9 @@ class FakeCameraRepository : CameraRepository {
         if (failIfConnectionNull && connectionToReturn == null) {
             throw RuntimeException("Connection not available (connectionToReturn is null)")
         }
-        return connectionToReturn ?: FakeCameraConnection(camera)
+        val connection = connectionToReturn ?: FakeCameraConnection(camera)
+        onConnectSuccess?.invoke(camera)
+        return connection
     }
 
     suspend fun emitDiscoveredCamera(camera: Camera) {

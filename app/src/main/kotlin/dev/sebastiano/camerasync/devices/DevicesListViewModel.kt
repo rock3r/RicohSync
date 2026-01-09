@@ -18,6 +18,7 @@ import dev.sebastiano.camerasync.domain.model.PairedDeviceWithState
 import dev.sebastiano.camerasync.domain.repository.LocationRepository
 import dev.sebastiano.camerasync.domain.repository.PairedDevicesRepository
 import dev.sebastiano.camerasync.domain.vendor.CameraVendorRegistry
+import dev.sebastiano.camerasync.pairing.BluetoothBondingChecker
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -42,6 +43,7 @@ class DevicesListViewModel(
     private val locationRepository: LocationRepository,
     private val bindingContextProvider: () -> Context,
     private val vendorRegistry: CameraVendorRegistry,
+    private val bluetoothBondingChecker: BluetoothBondingChecker,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : ViewModel() {
 
@@ -174,6 +176,14 @@ class DevicesListViewModel(
         viewModelScope.launch(ioDispatcher) {
             // First disconnect if connected
             service?.disconnectDevice(macAddress)
+
+            // Remove the OS-level Bluetooth bond
+            val bondRemoved = bluetoothBondingChecker.removeBond(macAddress)
+            if (!bondRemoved) {
+                Log.warn(tag = TAG) {
+                    "Could not remove OS-level bond for $macAddress (may not have been bonded)"
+                }
+            }
 
             // Then remove from storage
             pairedDevicesRepository.removeDevice(macAddress)

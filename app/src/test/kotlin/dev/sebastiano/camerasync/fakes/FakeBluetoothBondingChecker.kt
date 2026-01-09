@@ -7,6 +7,12 @@ import dev.sebastiano.camerasync.pairing.BluetoothBondingChecker
 class FakeBluetoothBondingChecker : BluetoothBondingChecker {
     private val bondedDevices = mutableSetOf<String>()
 
+    /** Controls whether createBond will succeed. */
+    var createBondSucceeds: Boolean = true
+
+    /** Controls whether createBond will automatically mark the device as bonded. */
+    var createBondAutoBonds: Boolean = true
+
     /** Sets whether a device is bonded. */
     fun setBonded(macAddress: String, bonded: Boolean) {
         if (bonded) {
@@ -33,5 +39,15 @@ class FakeBluetoothBondingChecker : BluetoothBondingChecker {
             bondedDevices.remove(macAddress.uppercase())
         }
         return wasBonded
+    }
+
+    override fun createBond(macAddress: String): Boolean {
+        if (!createBondSucceeds) {
+            return false
+        }
+        if (createBondAutoBonds) {
+            bondedDevices.add(macAddress.uppercase())
+        }
+        return true
     }
 }

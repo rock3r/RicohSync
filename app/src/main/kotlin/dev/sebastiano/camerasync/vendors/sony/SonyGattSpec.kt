@@ -47,7 +47,8 @@ object SonyGattSpec : CameraGattSpec {
     /** Pairing Characteristic (EE01) - write pairing initialization data. */
     val PAIRING_CHARACTERISTIC_UUID: Uuid = Uuid.parse("8000EE01-EE01-FFFF-FFFF-FFFFFFFFFFFF")
 
-    override val scanFilterServiceUuids: List<Uuid> = listOf(REMOTE_CONTROL_SERVICE_UUID, PAIRING_SERVICE_UUID)
+    override val scanFilterServiceUuids: List<Uuid> =
+        listOf(REMOTE_CONTROL_SERVICE_UUID, PAIRING_SERVICE_UUID)
 
     /** Device name prefixes for Sony Alpha cameras (ILCE = Interchangeable Lens Camera E-mount). */
     override val scanFilterDeviceNames: List<String> = listOf("ILCE-")

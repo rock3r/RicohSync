@@ -3,6 +3,7 @@ package dev.sebastiano.camerasync.devices
 import android.content.Context
 import dev.sebastiano.camerasync.CameraSyncApp
 import dev.sebastiano.camerasync.domain.model.PairedDevice
+import dev.sebastiano.camerasync.fakes.FakeBluetoothBondingChecker
 import dev.sebastiano.camerasync.fakes.FakeKhronicleLogger
 import dev.sebastiano.camerasync.fakes.FakeLocationRepository
 import dev.sebastiano.camerasync.fakes.FakePairedDevicesRepository
@@ -31,6 +32,7 @@ class DevicesListViewModelTest {
     private lateinit var pairedDevicesRepository: FakePairedDevicesRepository
     private lateinit var locationRepository: FakeLocationRepository
     private lateinit var vendorRegistry: FakeVendorRegistry
+    private lateinit var bluetoothBondingChecker: FakeBluetoothBondingChecker
     private lateinit var viewModel: DevicesListViewModel
     private val testDispatcher = UnconfinedTestDispatcher()
 
@@ -45,6 +47,7 @@ class DevicesListViewModelTest {
         pairedDevicesRepository = FakePairedDevicesRepository()
         locationRepository = FakeLocationRepository()
         vendorRegistry = FakeVendorRegistry()
+        bluetoothBondingChecker = FakeBluetoothBondingChecker()
 
         viewModel =
             DevicesListViewModel(
@@ -52,6 +55,7 @@ class DevicesListViewModelTest {
                 locationRepository = locationRepository,
                 bindingContextProvider = { mockContext() },
                 vendorRegistry = vendorRegistry,
+                bluetoothBondingChecker = bluetoothBondingChecker,
                 ioDispatcher = testDispatcher, // Inject test dispatcher for IO operations
             )
     }

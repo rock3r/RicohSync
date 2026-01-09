@@ -12,6 +12,8 @@ import com.juul.kable.logs.LogEngine
 import com.juul.kable.logs.Logging
 import com.juul.khronicle.Log
 import dev.sebastiano.camerasync.domain.model.Camera
+import dev.sebastiano.camerasync.domain.repository.CameraConnection
+import dev.sebastiano.camerasync.domain.repository.CameraRepository
 import dev.sebastiano.camerasync.domain.repository.PairedDevicesRepository
 import dev.sebastiano.camerasync.domain.vendor.CameraVendorRegistry
 import dev.sebastiano.camerasync.logging.KhronicleLogEngine
@@ -46,6 +48,7 @@ private const val TAG = "PairingViewModel"
 @OptIn(ExperimentalUuidApi::class)
 class PairingViewModel(
     private val pairedDevicesRepository: PairedDevicesRepository,
+    private val cameraRepository: CameraRepository,
     private val vendorRegistry: CameraVendorRegistry,
     private val bluetoothBondingChecker: BluetoothBondingChecker,
     private val loggingEngine: LogEngine = KhronicleLogEngine,
@@ -73,8 +76,10 @@ class PairingViewModel(
                     level = Logging.Level.Events
                     format = Logging.Format.Multiline
                 }
+                // Use SCAN_MODE_BALANCED to avoid Android throttling
+                // LOW_LATENCY scans too frequently and gets throttled after repeated use
                 scanSettings =
-                    ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY).build()
+                    ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_BALANCED).build()
             }
         } catch (e: Exception) {
             Log.warn(tag = TAG, throwable = e) {
@@ -159,9 +164,55 @@ class PairingViewModel(
 
                 _state.value = PairingScreenState.Pairing(camera)
 
+                var connection: CameraConnection? = null
                 try {
-                    // Add device to repository (this is the "pairing" - we store the device)
-                    // The actual BLE connection will happen when the device is enabled
+                    // First, initiate OS-level bonding explicitly
+                    // This triggers the system pairing dialog
+                    Log.info(tag = TAG) {
+                        "Initiating OS bonding for ${camera.name ?: camera.macAddress}..."
+                    }
+
+                    val bondInitiated = bluetoothBondingChecker.createBond(camera.macAddress)
+                    if (!bondInitiated) {
+                        Log.error(tag = TAG) { "Failed to initiate bonding" }
+                        _state.value =
+                            PairingScreenState.Pairing(camera, error = PairingError.UNKNOWN)
+                        return@launch
+                    }
+
+                    // Wait for bonding to complete (user accepts the pairing dialog)
+                    // Poll the bond state with a timeout
+                    val bondTimeout = 60_000L // 60 seconds for user to accept
+                    val pollInterval = 500L
+                    var elapsed = 0L
+
+                    while (
+                        !bluetoothBondingChecker.isDeviceBonded(camera.macAddress) &&
+                            elapsed < bondTimeout
+                    ) {
+                        delay(pollInterval)
+                        elapsed += pollInterval
+                    }
+
+                    if (!bluetoothBondingChecker.isDeviceBonded(camera.macAddress)) {
+                        Log.error(tag = TAG) {
+                            "Bonding timed out or was rejected for ${camera.macAddress}"
+                        }
+                        _state.value =
+                            PairingScreenState.Pairing(camera, error = PairingError.REJECTED)
+                        return@launch
+                    }
+
+                    Log.info(tag = TAG) { "OS bonding successful, establishing BLE connection..." }
+
+                    // Now establish a BLE connection to verify everything works
+                    Log.info(tag = TAG) { "Connecting to ${camera.name ?: camera.macAddress}..." }
+                    connection = cameraRepository.connect(camera)
+
+                    // If we get here, pairing was successful (user accepted the dialog)
+                    Log.info(tag = TAG) { "OS pairing successful, adding device to repository..." }
+
+                    // Now add the device to the paired devices repository
                     pairedDevicesRepository.addDevice(camera, enabled = true)
 
                     Log.info(tag = TAG) {
@@ -180,6 +231,14 @@ class PairingViewModel(
                             else -> PairingError.UNKNOWN
                         }
                     _state.value = PairingScreenState.Pairing(camera, error = error)
+                } finally {
+                    // Disconnect after pairing - the sync coordinator will reconnect
+                    // when the device is enabled
+                    try {
+                        connection?.disconnect()
+                    } catch (e: Exception) {
+                        Log.warn(tag = TAG, throwable = e) { "Error disconnecting after pairing" }
+                    }
                 }
             }
     }

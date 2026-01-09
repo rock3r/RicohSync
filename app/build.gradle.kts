@@ -1,6 +1,6 @@
-import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import java.io.FileInputStream
 import java.util.Properties
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     alias(libs.plugins.android.application)
@@ -13,13 +13,14 @@ plugins {
 
 val keystorePropertiesFile: File = project.file("keystore.properties")
 
-val keystoreProperties = Properties().apply {
-    if (keystorePropertiesFile.isFile) {
-        load(FileInputStream(keystorePropertiesFile))
-    } else {
-        logger.warn("Release signing configuration not provided")
+val keystoreProperties =
+    Properties().apply {
+        if (keystorePropertiesFile.isFile) {
+            load(FileInputStream(keystorePropertiesFile))
+        } else {
+            logger.warn("Release signing configuration not provided")
+        }
     }
-}
 
 android {
     namespace = "dev.sebastiano.camerasync"
