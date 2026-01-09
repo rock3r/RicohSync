@@ -5,11 +5,13 @@ on:
     types:
       - published
 
+permissions:
+  contents: write
+  discussions: write
+
 jobs:
   release-build:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -43,4 +45,4 @@ jobs:
         with:
           files: app/build/outputs/apk/release/app-release.apk
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
