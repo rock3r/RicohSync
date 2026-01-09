@@ -6,7 +6,9 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.metro)
     alias(libs.plugins.protobuf)
+    alias(libs.plugins.ktfmt)
 }
 
 val keystorePropertiesFile: File = project.file("keystore.properties")
@@ -20,11 +22,11 @@ val keystoreProperties = Properties().apply {
 }
 
 android {
-    namespace = "dev.sebastiano.ricohsync"
+    namespace = "dev.sebastiano.camerasync"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "dev.sebastiano.ricohsync"
+        applicationId = "dev.sebastiano.camerasync"
         minSdk = 33
         targetSdk = 36
         versionCode = 1
@@ -62,13 +64,12 @@ android {
     }
 
     buildFeatures { compose = true }
+    installation { installOptions += listOf("--user", "0") }
 }
 
-kotlin {
-    compilerOptions {
-        jvmTarget.set(JvmTarget.JVM_11)
-    }
-}
+ktfmt { kotlinLangStyle() }
+
+kotlin { compilerOptions { jvmTarget.set(JvmTarget.JVM_11) } }
 
 dependencies {
     implementation(platform(libs.androidx.compose.bom))
@@ -77,13 +78,22 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.dataStore)
     implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.androidx.lifecycle.process)
     implementation(libs.androidx.material3)
     implementation(libs.androidx.material.icons)
+    implementation(libs.androidx.navigation3.runtime)
+    implementation(libs.androidx.navigation3.ui)
+    implementation(libs.androidx.lifecycle.viewmodel.navigation3)
     implementation(libs.androidx.ui)
+    implementation(libs.androidx.ui.text.google.fonts)
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.kable)
+    implementation(libs.khronicle.core)
     implementation(libs.play.services.location)
+    implementation(libs.maplibre.core)
+    implementation(libs.maplibre.material3)
+    implementation(libs.maplibre.spatialk)
     implementation(libs.protobuf.kotlin.lite)
 
     debugImplementation(libs.androidx.ui.test.manifest)

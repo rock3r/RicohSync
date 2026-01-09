@@ -2,7 +2,7 @@
 
 A simple Android application that synchronizes GPS data and date/time from your Android phone to your camera via Bluetooth Low Energy (BLE).
 
-While originally built for Ricoh cameras, the app now supports a multi-vendor architecture, allowing it to be extended to other camera brands.
+The app supports a multi-vendor architecture, allowing it to work with cameras from various manufacturers (Ricoh, Sony, etc.).
 
 The app allows you to select your camera from nearby BLE devices on the first start. Once paired, it automatically reconnects and maintains synchronization in the background whenever the camera's Bluetooth is active.
 
@@ -46,8 +46,8 @@ For more details on how to add support for new vendors, see [MULTI_VENDOR_SUPPOR
 
 1. **Clone the repository**:
    ```bash
-   git clone https://github.com/yourusername/RicohSync.git
-   cd RicohSync
+   git clone https://github.com/yourusername/CameraSync.git
+   cd CameraSync
    ```
 
 2. **Open in Android Studio**:
@@ -94,10 +94,11 @@ No specific environment variables are required for a standard build. Ensure `JAV
 
 ## Technical Stack
 
-- **Language**: [Kotlin](https://kotlinlang.org/) (2.0.0)
+- **Language**: [Kotlin](https://kotlinlang.org/) (2.3.0)
 - **UI Framework**: [Jetpack Compose](https://developer.android.com/compose)
 - **BLE Library**: [Kable](https://github.com/JuulLabs/kable)
 - **Data Persistence**: [DataStore](https://developer.android.com/topic/libraries/architecture/datastore) with [Protocol Buffers](https://developers.google.com/protocol-buffers)
+- **Dependency Injection**: [Metro](https://github.com/ZacSweers/metro) (compile-time DI framework)
 - **Dependency Management**: Gradle Version Catalogs (`libs.versions.toml`)
 
 ## Testing

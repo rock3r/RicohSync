@@ -1,0 +1,343 @@
+package dev.sebastiano.camerasync.permissions
+
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.rounded.Bluetooth
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ElevatedButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import dev.sebastiano.camerasync.PermissionInfo
+import dev.sebastiano.camerasync.PermissionsRequester
+
+@Composable
+fun PermissionsScreen(onPermissionsGranted: () -> Unit) {
+    val viewModel = remember { PermissionsViewModel() }
+    val showSuccessAnimation = viewModel.showSuccessAnimation.value
+    val shouldNavigate by viewModel.shouldNavigate.collectAsState()
+
+    // Trigger navigation when ViewModel signals it
+    LaunchedEffect(shouldNavigate) {
+        if (shouldNavigate) {
+            onPermissionsGranted()
+        }
+    }
+
+    PermissionsRequester(
+        onPermissionsGranted = {
+            // Trigger animation when all permissions are granted
+            viewModel.onAllPermissionsGranted()
+        }
+    ) { permissions, requestAll ->
+        // Check permissions on each recomposition to catch when they're all granted
+        LaunchedEffect(permissions) { viewModel.checkPermissions(permissions) }
+
+        Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
+            Box(
+                modifier = Modifier.fillMaxSize().padding(innerPadding),
+                contentAlignment = Alignment.Center,
+            ) {
+                // Success animation overlay
+                if (showSuccessAnimation) {
+                    key(showSuccessAnimation) {
+                        AnimatedTickMark(
+                            modifier = Modifier.size(120.dp),
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                    }
+                }
+
+                // Main content with fade animation
+                val contentAlpha by
+                    animateFloatAsState(
+                        targetValue = if (showSuccessAnimation) 0f else 1f,
+                        label = "content_alpha",
+                        animationSpec = tween(durationMillis = 500),
+                    )
+
+                Column(
+                    modifier =
+                        Modifier.fillMaxWidth().padding(horizontal = 24.dp).alpha(contentAlpha),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(24.dp),
+                ) {
+                    // Header
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Text(
+                            text = "Welcome to CameraSync",
+                            style = MaterialTheme.typography.headlineMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                        Text(
+                            text = "We need a few permissions to sync GPS data to your camera",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+
+                    Spacer(Modifier.height(8.dp))
+
+                    // Permissions checklist
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(20.dp),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                        colors =
+                            CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceVariant
+                            ),
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(20.dp),
+                            verticalArrangement = Arrangement.spacedBy(16.dp),
+                        ) {
+                            permissions.forEachIndexed { index, permission ->
+                                PermissionChecklistItem(
+                                    permission = permission,
+                                    modifier = Modifier.fillMaxWidth(),
+                                )
+                                if (index < permissions.size - 1) {
+                                    Spacer(Modifier.height(4.dp))
+                                }
+                            }
+                        }
+                    }
+
+                    // Request button - only show when there are missing permissions
+                    val hasMissingPermissions = permissions.any { !it.isGranted }
+                    AnimatedVisibility(visible = hasMissingPermissions) {
+                        ElevatedButton(
+                            onClick = { requestAll() },
+                            modifier = Modifier.fillMaxWidth().height(56.dp),
+                            shape = RoundedCornerShape(16.dp),
+                        ) {
+                            Text(
+                                text = "Grant All Permissions",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PermissionChecklistItem(permission: PermissionInfo, modifier: Modifier = Modifier) {
+    val iconColor by
+        animateColorAsState(
+            targetValue =
+                if (permission.isGranted) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                },
+            label = "icon_color",
+            animationSpec = tween(durationMillis = 300),
+        )
+
+    val checkmarkScale by
+        animateFloatAsState(
+            targetValue = if (permission.isGranted) 1f else 0f,
+            label = "checkmark_scale",
+            animationSpec = tween(durationMillis = 300),
+        )
+
+    val itemAlpha by
+        animateFloatAsState(
+            targetValue = if (permission.isGranted) 0.7f else 1f,
+            label = "item_alpha",
+            animationSpec = tween(durationMillis = 300),
+        )
+
+    Row(
+        modifier = modifier.alpha(itemAlpha),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        // Permission icon
+        Box(
+            modifier =
+                Modifier.size(48.dp).clip(CircleShape).background(iconColor.copy(alpha = 0.15f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            val icon =
+                when (permission.name) {
+                    "Location" -> Icons.Default.LocationOn
+                    "Bluetooth Scan",
+                    "Bluetooth Connect" -> Icons.Rounded.Bluetooth
+                    "Notifications" -> Icons.Default.Notifications
+                    else -> Icons.Rounded.Bluetooth
+                }
+            Icon(icon, contentDescription = null, tint = iconColor, modifier = Modifier.size(24.dp))
+        }
+
+        // Permission info
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = permission.name,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Text(
+                text = permission.description,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
+        // Status indicator
+        Box(modifier = Modifier.size(32.dp), contentAlignment = Alignment.Center) {
+            Crossfade(
+                targetState = permission.isGranted,
+                animationSpec = tween(durationMillis = 300),
+                label = "permission_status",
+            ) { isGranted ->
+                if (isGranted) {
+                    Icon(
+                        Icons.Default.CheckCircle,
+                        contentDescription = "Granted",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.scale(checkmarkScale),
+                    )
+                } else {
+                    Box(
+                        modifier =
+                            Modifier.size(20.dp)
+                                .clip(CircleShape)
+                                .background(
+                                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
+                                )
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AnimatedTickMark(
+    modifier: Modifier = Modifier,
+    color: Color = Color.Green,
+    strokeWidth: Float = 8f,
+    animationDuration: Int = 600,
+) {
+    // Start at 0 and animate to 1
+    var targetProgress by remember { mutableStateOf(0f) }
+
+    LaunchedEffect(Unit) { targetProgress = 1f }
+
+    val pathProgress by
+        animateFloatAsState(
+            targetValue = targetProgress,
+            animationSpec = tween(durationMillis = animationDuration),
+            label = "tick_path_progress",
+        )
+
+    Canvas(modifier = modifier) {
+        val width = size.width
+        val height = size.height
+        val centerX = width / 2
+        val centerY = height / 2
+
+        // Define tick mark points
+        val startX = centerX - width * 0.25f
+        val startY = centerY
+        val middleX = centerX
+        val middleY = centerY + height * 0.2f
+        val endX = centerX + width * 0.3f
+        val endY = centerY - height * 0.2f
+
+        // Calculate segment lengths
+        val firstSegmentLength =
+            kotlin.math.sqrt(
+                (middleX - startX) * (middleX - startX) + (middleY - startY) * (middleY - startY)
+            )
+        val secondSegmentLength =
+            kotlin.math.sqrt(
+                (endX - middleX) * (endX - middleX) + (endY - middleY) * (endY - middleY)
+            )
+        val totalLength = firstSegmentLength + secondSegmentLength
+
+        // Draw first segment (bottom-left to center)
+        if (pathProgress > 0f) {
+            val firstProgress = (pathProgress * totalLength / firstSegmentLength).coerceAtMost(1f)
+            val firstEndX = startX + (middleX - startX) * firstProgress
+            val firstEndY = startY + (middleY - startY) * firstProgress
+
+            drawLine(
+                color = color,
+                start = Offset(startX, startY),
+                end = Offset(firstEndX, firstEndY),
+                strokeWidth = strokeWidth,
+                cap = StrokeCap.Round,
+            )
+        }
+
+        // Draw second segment (center to top-right)
+        if (pathProgress * totalLength > firstSegmentLength) {
+            val secondProgress =
+                ((pathProgress * totalLength - firstSegmentLength) / secondSegmentLength)
+                    .coerceAtMost(1f)
+            val secondEndX = middleX + (endX - middleX) * secondProgress
+            val secondEndY = middleY + (endY - middleY) * secondProgress
+
+            drawLine(
+                color = color,
+                start = Offset(middleX, middleY),
+                end = Offset(secondEndX, secondEndY),
+                strokeWidth = strokeWidth,
+                cap = StrokeCap.Round,
+            )
+        }
+    }
+}

@@ -104,3 +104,6 @@ $RECYCLE.BIN/
 # Avoid leaking keystores
 *.jks
 keystore.properties
+
+# VSC-forks shit
+/.vscode/tasks.json

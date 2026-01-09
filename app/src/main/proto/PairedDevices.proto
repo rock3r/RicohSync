@@ -1,0 +1,33 @@
+syntax = "proto3";
+
+option java_package = "dev.sebastiano.camerasync.proto";
+option java_multiple_files = true;
+
+// Represents a single paired camera device
+message PairedDeviceProto {
+  // The MAC address (Bluetooth identifier) of the device
+  string mac_address = 1;
+  
+  // Human-readable device name (e.g., "GR IIIx")
+  optional string name = 2;
+  
+  // Vendor identifier (e.g., "ricoh", "sony")
+  string vendor_id = 3;
+  
+  // Whether this device is enabled for sync
+  bool enabled = 4;
+
+  // The timestamp of the last successful sync (millis since epoch)
+  optional int64 last_synced_at = 5;
+}
+
+// Collection of all paired devices
+message PairedDevicesProto {
+  // List of all paired devices
+  repeated PairedDeviceProto devices = 1;
+
+  // Whether global synchronization is enabled.
+  // If false, the service won't start automatically.
+  optional bool sync_enabled = 2;
+}
+

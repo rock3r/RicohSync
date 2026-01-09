@@ -1,0 +1,814 @@
+package dev.sebastiano.camerasync.devices
+
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.EaseInOut
+import androidx.compose.animation.core.InfiniteRepeatableSpec
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredSize
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.LinkedCamera
+import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.BluetoothDisabled
+import androidx.compose.material.icons.rounded.CameraAlt
+import androidx.compose.material.icons.rounded.Error
+import androidx.compose.material.icons.rounded.ExpandLess
+import androidx.compose.material.icons.rounded.ExpandMore
+import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.ButtonColors
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ElevatedButton
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import dev.sebastiano.camerasync.devicesync.formatElapsedTimeSince
+import dev.sebastiano.camerasync.domain.model.DeviceConnectionState
+import dev.sebastiano.camerasync.domain.model.GpsLocation
+import dev.sebastiano.camerasync.domain.model.PairedDeviceWithState
+import java.time.ZonedDateTime
+import kotlin.math.PI
+import kotlin.math.cos
+import kotlin.math.sin
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.TimeMark
+import kotlin.time.TimeSource
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import org.maplibre.compose.camera.CameraPosition
+import org.maplibre.compose.camera.rememberCameraState
+import org.maplibre.compose.location.Location
+import org.maplibre.compose.location.LocationProvider
+import org.maplibre.compose.location.LocationPuck
+import org.maplibre.compose.location.LocationPuckColors
+import org.maplibre.compose.location.LocationPuckSizes
+import org.maplibre.compose.location.LocationTrackingEffect
+import org.maplibre.compose.location.rememberUserLocationState
+import org.maplibre.compose.map.MapOptions
+import org.maplibre.compose.map.MaplibreMap
+import org.maplibre.compose.map.OrnamentOptions
+import org.maplibre.compose.material3.CompassButton
+import org.maplibre.compose.material3.LocationPuckDefaults
+import org.maplibre.compose.style.BaseStyle
+import org.maplibre.compose.style.rememberStyleState
+import org.maplibre.spatialk.geojson.Position
+
+/** Main screen showing the list of paired devices with their sync status. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun DevicesListScreen(viewModel: DevicesListViewModel, onAddDeviceClick: () -> Unit) {
+    val state by viewModel.state
+    var deviceToUnpair by remember { mutableStateOf<PairedDeviceWithState?>(null) }
+
+    Scaffold(
+        modifier = Modifier.fillMaxSize(),
+        topBar = {
+            TopAppBar(
+                title = {
+                    Text(
+                        "CameraSync",
+                        style = MaterialTheme.typography.headlineMedium,
+                        fontWeight = FontWeight.Bold,
+                    )
+                },
+                actions = {
+                    val currentState = state
+                    if (currentState is DevicesListState.HasDevices) {
+                        val hasEnabledCameras = currentState.devices.any { it.device.isEnabled }
+                        IconButton(
+                            onClick = { viewModel.refreshConnections() },
+                            enabled = hasEnabledCameras,
+                        ) {
+                            Icon(Icons.Rounded.Refresh, contentDescription = "Refresh connections")
+                        }
+                    }
+                },
+            )
+        },
+        floatingActionButton = {
+            FloatingActionButton(onClick = onAddDeviceClick) {
+                Icon(Icons.Rounded.Add, contentDescription = "Add device")
+            }
+        },
+    ) { innerPadding ->
+        when (val currentState = state) {
+            is DevicesListState.Loading -> {
+                LoadingContent(Modifier.padding(innerPadding))
+            }
+
+            is DevicesListState.Empty -> {
+                EmptyContent(
+                    modifier = Modifier.padding(innerPadding),
+                    onAddDeviceClick = onAddDeviceClick,
+                )
+            }
+
+            is DevicesListState.HasDevices -> {
+                Box(modifier = Modifier.padding(innerPadding)) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        LocationCard(
+                            location = currentState.currentLocation,
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                        )
+
+                        if (!currentState.isSyncEnabled) {
+                            SyncStoppedWarning(
+                                onRefreshClick = { viewModel.refreshConnections() },
+                                enabled = currentState.devices.any { it.device.isEnabled },
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                            )
+                        }
+
+                        DevicesList(
+                            devices = currentState.devices,
+                            displayInfoMap = currentState.displayInfoMap,
+                            onDeviceEnabledChange = { device, enabled ->
+                                viewModel.setDeviceEnabled(device.device.macAddress, enabled)
+                            },
+                            onUnpairClick = { device -> deviceToUnpair = device },
+                            onRetryClick = { device ->
+                                viewModel.retryConnection(device.device.macAddress)
+                            },
+                        )
+                    }
+
+                    AnimatedVisibility(
+                        currentState.isScanning,
+                        enter = fadeIn(),
+                        exit = fadeOut(),
+                    ) {
+                        LinearProgressIndicator(
+                            modifier = Modifier.align(Alignment.TopCenter).fillMaxWidth()
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    // Unpair confirmation dialog
+    deviceToUnpair?.let { device ->
+        UnpairConfirmationDialog(
+            deviceName = device.device.name ?: device.device.macAddress,
+            onConfirm = {
+                viewModel.unpairDevice(device.device.macAddress)
+                deviceToUnpair = null
+            },
+            onDismiss = { deviceToUnpair = null },
+        )
+    }
+}
+
+@Composable
+private fun LoadingContent(modifier: Modifier = Modifier) {
+    Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Text("Loading devices...", style = MaterialTheme.typography.bodyLarge)
+    }
+}
+
+@Composable
+private fun EmptyContent(modifier: Modifier = Modifier, onAddDeviceClick: () -> Unit) {
+    Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.padding(32.dp),
+        ) {
+            Icon(
+                Icons.Rounded.CameraAlt,
+                contentDescription = null,
+                modifier = Modifier.size(64.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+            )
+
+            Spacer(Modifier.height(16.dp))
+
+            Text(
+                "No cameras paired",
+                style = MaterialTheme.typography.headlineSmall,
+                color = MaterialTheme.colorScheme.onSurface,
+                fontWeight = FontWeight.Bold,
+            )
+
+            Spacer(Modifier.height(8.dp))
+
+            Text(
+                "Tap the + button to pair a camera",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@Composable
+private fun DevicesList(
+    devices: List<PairedDeviceWithState>,
+    displayInfoMap: Map<String, DeviceDisplayInfo>,
+    onDeviceEnabledChange: (PairedDeviceWithState, Boolean) -> Unit,
+    onUnpairClick: (PairedDeviceWithState) -> Unit,
+    onRetryClick: (PairedDeviceWithState) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    LazyColumn(
+        modifier = modifier.fillMaxSize(),
+        contentPadding =
+            PaddingValues(
+                start = 16.dp,
+                top = 0.dp,
+                end = 16.dp,
+                bottom = 80.dp, // Room for FAB
+            ),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        items(devices, key = { it.device.macAddress }) { deviceWithState ->
+            val displayInfo = displayInfoMap[deviceWithState.device.macAddress]
+            DeviceCard(
+                deviceWithState = deviceWithState,
+                displayInfo = displayInfo,
+                onEnabledChange = { enabled -> onDeviceEnabledChange(deviceWithState, enabled) },
+                onUnpairClick = { onUnpairClick(deviceWithState) },
+                onRetryClick = { onRetryClick(deviceWithState) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun DeviceCard(
+    deviceWithState: PairedDeviceWithState,
+    displayInfo: DeviceDisplayInfo?,
+    onEnabledChange: (Boolean) -> Unit,
+    onUnpairClick: () -> Unit,
+    onRetryClick: () -> Unit,
+) {
+    var isExpanded by remember { mutableStateOf(false) }
+    val device = deviceWithState.device
+    val connectionState = deviceWithState.connectionState
+    val info = displayInfo ?: DeviceDisplayInfo("Unknown", "Unknown", device.name, false)
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.medium,
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        colors =
+            CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+            ),
+    ) {
+        Column {
+            // Main row
+            Row(
+                modifier =
+                    Modifier.fillMaxWidth().clickable { isExpanded = !isExpanded }.padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                // Status indicator
+                ConnectionStatusIcon(connectionState)
+
+                Spacer(Modifier.width(16.dp))
+
+                // Device info
+                Column(modifier = Modifier.weight(1f)) {
+                    // Show make and model, with pairing name if needed
+                    val titleText =
+                        if (info.showPairingName && info.pairingName != null) {
+                            "${info.make} ${info.model} (${info.pairingName})"
+                        } else {
+                            "${info.make} ${info.model}"
+                        }
+                    Text(
+                        text = titleText,
+                        style = MaterialTheme.typography.titleMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+
+                    Spacer(Modifier.height(2.dp))
+
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        ConnectionStatusText(connectionState)
+
+                        if (
+                            device.lastSyncedAt != null &&
+                                connectionState is DeviceConnectionState.Syncing
+                        ) {
+                            Text(
+                                text = " • ${formatElapsedTimeSince(device.lastSyncedAt)}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color =
+                                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
+                }
+
+                // Enable/disable switch
+                Switch(checked = device.isEnabled, onCheckedChange = onEnabledChange)
+
+                Spacer(Modifier.width(8.dp))
+
+                // Expand indicator
+                Icon(
+                    if (isExpanded) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
+                    contentDescription = if (isExpanded) "Collapse" else "Expand",
+                    modifier = Modifier.alpha(0.6f),
+                )
+            }
+
+            // Expanded content
+            AnimatedVisibility(
+                visible = isExpanded,
+                enter = expandVertically(),
+                exit = shrinkVertically(),
+            ) {
+                Column(
+                    modifier =
+                        Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 8.dp)
+                ) {
+                    // Device details
+                    DeviceDetailRow("Make", info.make)
+                    DeviceDetailRow("Model", info.model)
+                    if (info.pairingName != null) {
+                        DeviceDetailRow("Pairing Name", info.pairingName)
+                    }
+                    DeviceDetailRow("MAC Address", device.macAddress)
+
+                    if (device.lastSyncedAt != null) {
+                        DeviceDetailRow("Last sync", formatElapsedTimeSince(device.lastSyncedAt))
+                    }
+
+                    if (connectionState is DeviceConnectionState.Syncing) {
+                        connectionState.firmwareVersion?.let { version ->
+                            DeviceDetailRow("Firmware", version)
+                        }
+                    }
+
+                    if (connectionState is DeviceConnectionState.Unreachable) {
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            text = "Camera not found nearby.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        TextButton(onClick = onRetryClick) { Text("Retry connection") }
+                    }
+
+                    if (connectionState is DeviceConnectionState.Error) {
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            text = connectionState.message,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+
+                        if (connectionState.isRecoverable) {
+                            Spacer(Modifier.height(8.dp))
+                            TextButton(onClick = onRetryClick) { Text("Retry connection") }
+                        }
+                    }
+
+                    Spacer(Modifier.height(12.dp))
+
+                    // Unpair action
+                    TextButton(onClick = onUnpairClick, modifier = Modifier.align(Alignment.End)) {
+                        Text("Unpair device", color = MaterialTheme.colorScheme.error)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ConnectionStatusIcon(state: DeviceConnectionState) {
+    val (icon, color) =
+        when (state) {
+            is DeviceConnectionState.Disabled ->
+                Icons.Default.PhotoCamera to
+                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+
+            is DeviceConnectionState.Disconnected ->
+                Icons.Default.PhotoCamera to MaterialTheme.colorScheme.onSurfaceVariant
+
+            is DeviceConnectionState.Searching ->
+                Icons.Default.Search to MaterialTheme.colorScheme.primary
+
+            is DeviceConnectionState.Connecting ->
+                Icons.Default.LinkedCamera to MaterialTheme.colorScheme.primary
+
+            is DeviceConnectionState.Unreachable ->
+                Icons.Default.PhotoCamera to
+                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+
+            is DeviceConnectionState.Connected ->
+                Icons.Default.LinkedCamera to MaterialTheme.colorScheme.primary
+
+            is DeviceConnectionState.Syncing ->
+                Icons.Default.LinkedCamera to MaterialTheme.colorScheme.primary
+
+            is DeviceConnectionState.Error -> Icons.Rounded.Error to MaterialTheme.colorScheme.error
+        }
+
+    val animatedColor by animateColorAsState(targetValue = color, label = "status_color")
+
+    Box(
+        modifier =
+            Modifier.size(40.dp).clip(CircleShape).background(animatedColor.copy(alpha = 0.15f)),
+        contentAlignment = Alignment.Center,
+    ) {
+        val infiniteTransition = rememberInfiniteTransition(label = "icon_animation")
+
+        when (state) {
+            is DeviceConnectionState.Searching -> {
+                val angle by
+                    infiniteTransition.animateFloat(
+                        initialValue = 0f,
+                        targetValue = 360f,
+                        animationSpec =
+                            InfiniteRepeatableSpec(
+                                animation = tween(1500, easing = LinearEasing),
+                                repeatMode = RepeatMode.Restart,
+                            ),
+                        label = "searching_rotation",
+                    )
+
+                // Move in a small circle
+                val radius = 2.dp
+                val x = radius * cos(angle.toDouble() * (PI / 180.0)).toFloat()
+                val y = radius * sin(angle.toDouble() * (PI / 180.0)).toFloat()
+
+                Icon(
+                    icon,
+                    contentDescription = null,
+                    tint = animatedColor,
+                    modifier = Modifier.offset(x = x, y = y),
+                )
+            }
+
+            is DeviceConnectionState.Connecting -> {
+                val alpha by
+                    infiniteTransition.animateFloat(
+                        initialValue = 0.3f,
+                        targetValue = 1f,
+                        animationSpec =
+                            InfiniteRepeatableSpec(
+                                animation = tween(800, easing = EaseInOut),
+                                repeatMode = RepeatMode.Reverse,
+                            ),
+                        label = "connecting_blink",
+                    )
+
+                Icon(
+                    icon,
+                    contentDescription = null,
+                    tint = animatedColor,
+                    modifier = Modifier.alpha(alpha),
+                )
+            }
+
+            is DeviceConnectionState.Syncing -> {
+                val rotation by
+                    infiniteTransition.animateFloat(
+                        initialValue = 0f,
+                        targetValue = 360f,
+                        animationSpec =
+                            InfiniteRepeatableSpec(
+                                animation = tween(1500, easing = LinearEasing),
+                                repeatMode = RepeatMode.Restart,
+                            ),
+                        label = "syncing_rotation",
+                    )
+
+                Icon(
+                    icon,
+                    contentDescription = null,
+                    tint = animatedColor,
+                    modifier = Modifier.rotate(rotation),
+                )
+            }
+
+            else -> {
+                Icon(icon, contentDescription = null, tint = animatedColor)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ConnectionStatusText(state: DeviceConnectionState) {
+    val (text, color) =
+        when (state) {
+            is DeviceConnectionState.Disabled ->
+                "Disabled" to MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+
+            is DeviceConnectionState.Disconnected ->
+                "Disconnected" to MaterialTheme.colorScheme.onSurfaceVariant
+
+            is DeviceConnectionState.Searching ->
+                "Searching..." to MaterialTheme.colorScheme.primary
+            is DeviceConnectionState.Connecting ->
+                "Connecting..." to MaterialTheme.colorScheme.primary
+
+            is DeviceConnectionState.Unreachable ->
+                "Unreachable" to MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+
+            is DeviceConnectionState.Connected -> "Connected" to MaterialTheme.colorScheme.primary
+            is DeviceConnectionState.Error -> state.message to MaterialTheme.colorScheme.error
+            is DeviceConnectionState.Syncing -> "Syncing" to MaterialTheme.colorScheme.primary
+        }
+
+    Text(text = text, style = MaterialTheme.typography.bodySmall, color = color)
+}
+
+@Composable
+private fun DeviceDetailRow(label: String, value: String) {
+    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.width(100.dp).alignByBaseline(),
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.alignByBaseline(),
+        )
+    }
+}
+
+@Composable
+private fun UnpairConfirmationDialog(
+    deviceName: String,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Unpair device?") },
+        text = {
+            Text(
+                "Are you sure you want to unpair \"$deviceName\"? You'll need to pair it again to sync data."
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = onConfirm) {
+                Text("Unpair", color = MaterialTheme.colorScheme.error)
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
+}
+
+@Composable
+private fun SyncStoppedWarning(
+    onRefreshClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+) {
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.medium,
+        colors =
+            CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.errorContainer,
+                contentColor = MaterialTheme.colorScheme.onErrorContainer,
+            ),
+    ) {
+        Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                Icons.Rounded.BluetoothDisabled,
+                contentDescription = null,
+                modifier = Modifier.size(24.dp),
+            )
+
+            Spacer(Modifier.width(16.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(text = "Searching stopped", style = MaterialTheme.typography.titleSmall)
+                Text(
+                    text = "Tap to resume searching for cameras",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+
+            IconButton(onClick = onRefreshClick, enabled = enabled) {
+                Icon(Icons.Rounded.Refresh, contentDescription = "Resume searching")
+            }
+        }
+    }
+}
+
+@Composable
+private fun LocationCard(location: GpsLocation?, modifier: Modifier = Modifier) {
+    Card(
+        modifier = modifier.fillMaxWidth().height(200.dp),
+        shape = MaterialTheme.shapes.medium,
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+    ) {
+        if (location == null) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    CircularProgressIndicator(modifier = Modifier.size(32.dp))
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "Acquiring location...",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        } else {
+            val isDarkTheme = isSystemInDarkTheme()
+            val mapStyle =
+                if (isDarkTheme) "https://tiles.openfreemap.org/styles/dark"
+                else "https://tiles.openfreemap.org/styles/positron"
+
+            val cameraState =
+                rememberCameraState(
+                    CameraPosition(
+                        target = Position(location.longitude, location.latitude),
+                        zoom = 14.0,
+                    )
+                )
+
+            // Update camera when location changes
+            val locationFlow = remember { MutableStateFlow(location.toMapBoxLocation()) }
+
+            val userState =
+                rememberUserLocationState(
+                    object : LocationProvider {
+                        override val location: StateFlow<Location?> = locationFlow
+                    }
+                )
+            LocationTrackingEffect(userState) {
+                cameraState.animateTo(
+                    CameraPosition(
+                        target = Position(location.longitude, location.latitude),
+                        zoom = cameraState.position.zoom, // Keep current zoom
+                    )
+                )
+                locationFlow.value = location.toMapBoxLocation()
+            }
+
+            val styleState = rememberStyleState()
+            Box(modifier = Modifier.fillMaxSize()) {
+                MaplibreMap(
+                    modifier = Modifier.fillMaxSize(),
+                    baseStyle = BaseStyle.Uri(mapStyle),
+                    styleState = styleState,
+                    cameraState = cameraState,
+                    options =
+                        MapOptions(
+                            ornamentOptions =
+                                OrnamentOptions(
+                                    padding = PaddingValues(8.dp),
+                                    isScaleBarEnabled = false,
+                                    isLogoEnabled = false,
+                                    isCompassEnabled = false,
+                                )
+                        ),
+                ) {
+                    LocationPuck(
+                        idPrefix = "user-location",
+                        cameraState = cameraState,
+                        locationState = userState,
+                        colors = LocationPuckDefaults.colors(),
+                    )
+                }
+
+                Column(
+                    Modifier.align(Alignment.TopEnd).padding(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalAlignment = Alignment.End,
+                ) {
+                    CompassButton(cameraState)
+                    UserLocationButton {
+                        cameraState.position =
+                            CameraPosition(
+                                target = Position(location.longitude, location.latitude),
+                                zoom = cameraState.position.zoom, // Keep current zoom
+                            )
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun GpsLocation.toMapBoxLocation() =
+    Location(
+        Position(longitude, latitude),
+        accuracy.toDouble(),
+        bearing = null,
+        bearingAccuracy = null,
+        speed = null,
+        speedAccuracy = null,
+        timestamp.toTimeMark(),
+    )
+
+private fun ZonedDateTime.toTimeMark(): TimeMark {
+    val now = ZonedDateTime.now()
+    // Calculate the difference in milliseconds
+    val diffMillis = toInstant().toEpochMilli() - now.toInstant().toEpochMilli()
+
+    // Create a mark that is 'diff' away from the current monotonic 'now'
+    return TimeSource.Monotonic.markNow() + diffMillis.milliseconds
+}
+
+@Composable
+private fun UserLocationButton(
+    modifier: Modifier = Modifier,
+    colors: ButtonColors = ButtonDefaults.elevatedButtonColors(),
+    puckColors: LocationPuckColors = LocationPuckDefaults.colors(),
+    puckSizes: LocationPuckSizes = LocationPuckSizes(),
+    contentDescription: String = "User location",
+    size: Dp = 48.dp,
+    contentPadding: PaddingValues = PaddingValues(size / 6),
+    shape: Shape = CircleShape,
+    onClick: () -> Unit,
+) {
+    ElevatedButton(
+        modifier = modifier.requiredSize(size).aspectRatio(1f),
+        onClick = onClick,
+        shape = shape,
+        colors = colors,
+        contentPadding = contentPadding,
+    ) {
+        Canvas(modifier = Modifier.semantics { this.contentDescription = contentDescription }) {
+            drawCircle(
+                puckColors.dotStrokeColor,
+                puckSizes.dotRadius.toPx(),
+                style = Stroke(puckSizes.dotStrokeWidth.toPx()),
+            )
+            drawCircle(puckColors.dotFillColorCurrentLocation, puckSizes.dotRadius.toPx())
+        }
+    }
+}

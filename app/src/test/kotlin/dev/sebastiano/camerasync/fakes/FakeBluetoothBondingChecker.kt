@@ -1,0 +1,37 @@
+package dev.sebastiano.camerasync.fakes
+
+import android.bluetooth.BluetoothDevice
+import dev.sebastiano.camerasync.pairing.BluetoothBondingChecker
+
+/** Fake implementation of [BluetoothBondingChecker] for testing. */
+class FakeBluetoothBondingChecker : BluetoothBondingChecker {
+    private val bondedDevices = mutableSetOf<String>()
+
+    /** Sets whether a device is bonded. */
+    fun setBonded(macAddress: String, bonded: Boolean) {
+        if (bonded) {
+            bondedDevices.add(macAddress.uppercase())
+        } else {
+            bondedDevices.remove(macAddress.uppercase())
+        }
+    }
+
+    override fun isDeviceBonded(macAddress: String): Boolean {
+        return bondedDevices.contains(macAddress.uppercase())
+    }
+
+    override fun getBondedDevice(macAddress: String): BluetoothDevice? {
+        // Return null as we can't create a real BluetoothDevice in tests
+        // This is fine since tests don't need the actual device object
+        // The removeBond method will still work via isDeviceBonded check
+        return null
+    }
+
+    override fun removeBond(macAddress: String): Boolean {
+        val wasBonded = isDeviceBonded(macAddress)
+        if (wasBonded) {
+            bondedDevices.remove(macAddress.uppercase())
+        }
+        return wasBonded
+    }
+}
