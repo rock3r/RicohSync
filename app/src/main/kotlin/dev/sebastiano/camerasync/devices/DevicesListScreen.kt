@@ -1,9 +1,11 @@
 package dev.sebastiano.camerasync.devices
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.EaseInOut
 import androidx.compose.animation.core.InfiniteRepeatableSpec
+import androidx.compose.animation.core.InfiniteTransition
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -12,6 +14,10 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.graphics.ExperimentalAnimationGraphicsApi
+import androidx.compose.animation.graphics.res.animatedVectorResource
+import androidx.compose.animation.graphics.res.rememberAnimatedVectorPainter
+import androidx.compose.animation.graphics.vector.AnimatedImageVector
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -35,17 +41,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.LinkedCamera
-import androidx.compose.material.icons.filled.PhotoCamera
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.rounded.Add
-import androidx.compose.material.icons.rounded.BluetoothDisabled
-import androidx.compose.material.icons.rounded.CameraAlt
-import androidx.compose.material.icons.rounded.Error
-import androidx.compose.material.icons.rounded.ExpandLess
-import androidx.compose.material.icons.rounded.ExpandMore
-import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonColors
 import androidx.compose.material3.ButtonDefaults
@@ -65,6 +60,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -73,15 +69,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import dev.sebastiano.camerasync.R
 import dev.sebastiano.camerasync.devicesync.formatElapsedTimeSince
 import dev.sebastiano.camerasync.domain.model.DeviceConnectionState
 import dev.sebastiano.camerasync.domain.model.GpsLocation
@@ -93,6 +91,7 @@ import kotlin.math.sin
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeMark
 import kotlin.time.TimeSource
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import org.maplibre.compose.camera.CameraPosition
@@ -139,7 +138,10 @@ fun DevicesListScreen(viewModel: DevicesListViewModel, onAddDeviceClick: () -> U
                             onClick = { viewModel.refreshConnections() },
                             enabled = hasEnabledCameras,
                         ) {
-                            Icon(Icons.Rounded.Refresh, contentDescription = "Refresh connections")
+                            Icon(
+                                painterResource(R.drawable.ic_refresh_24dp),
+                                contentDescription = "Refresh connections",
+                            )
                         }
                     }
                 },
@@ -147,7 +149,10 @@ fun DevicesListScreen(viewModel: DevicesListViewModel, onAddDeviceClick: () -> U
         },
         floatingActionButton = {
             FloatingActionButton(onClick = onAddDeviceClick) {
-                Icon(Icons.Rounded.Add, contentDescription = "Add device")
+                Icon(
+                    painterResource(R.drawable.ic_add_camera_24dp),
+                    contentDescription = "Add device",
+                )
             }
         },
     ) { innerPadding ->
@@ -157,10 +162,7 @@ fun DevicesListScreen(viewModel: DevicesListViewModel, onAddDeviceClick: () -> U
             }
 
             is DevicesListState.Empty -> {
-                EmptyContent(
-                    modifier = Modifier.padding(innerPadding),
-                    onAddDeviceClick = onAddDeviceClick,
-                )
+                EmptyContent(modifier = Modifier.padding(innerPadding))
             }
 
             is DevicesListState.HasDevices -> {
@@ -230,14 +232,14 @@ private fun LoadingContent(modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun EmptyContent(modifier: Modifier = Modifier, onAddDeviceClick: () -> Unit) {
+private fun EmptyContent(modifier: Modifier = Modifier) {
     Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier.padding(32.dp),
         ) {
             Icon(
-                Icons.Rounded.CameraAlt,
+                painterResource(R.drawable.ic_photo_camera_24dp),
                 contentDescription = null,
                 modifier = Modifier.size(64.dp),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
@@ -374,7 +376,9 @@ private fun DeviceCard(
 
                 // Expand indicator
                 Icon(
-                    if (isExpanded) Icons.Rounded.ExpandLess else Icons.Rounded.ExpandMore,
+                    painterResource(
+                        if (isExpanded) R.drawable.ic_collapse_24dp else R.drawable.ic_expand_24dp
+                    ),
                     contentDescription = if (isExpanded) "Collapse" else "Expand",
                     modifier = Modifier.alpha(0.6f),
                 )
@@ -450,113 +454,153 @@ private fun ConnectionStatusIcon(state: DeviceConnectionState) {
     val (icon, color) =
         when (state) {
             is DeviceConnectionState.Disabled ->
-                Icons.Default.PhotoCamera to
+                R.drawable.ic_photo_camera_24dp to
                     MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
 
             is DeviceConnectionState.Disconnected ->
-                Icons.Default.PhotoCamera to MaterialTheme.colorScheme.onSurfaceVariant
+                R.drawable.ic_bluetooth_disabled_24dp to MaterialTheme.colorScheme.onSurfaceVariant
 
             is DeviceConnectionState.Searching ->
-                Icons.Default.Search to MaterialTheme.colorScheme.primary
+                R.drawable.ic_search_24dp to MaterialTheme.colorScheme.primary
 
             is DeviceConnectionState.Connecting ->
-                Icons.Default.LinkedCamera to MaterialTheme.colorScheme.primary
+                R.drawable.ic_bluetooth_searching_24dp to MaterialTheme.colorScheme.primary
 
             is DeviceConnectionState.Unreachable ->
-                Icons.Default.PhotoCamera to
+                R.drawable.ic_bluetooth_disabled_24dp to
                     MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
 
             is DeviceConnectionState.Connected ->
-                Icons.Default.LinkedCamera to MaterialTheme.colorScheme.primary
+                R.drawable.ic_bluetooth_connected_24dp to MaterialTheme.colorScheme.primary
 
             is DeviceConnectionState.Syncing ->
-                Icons.Default.LinkedCamera to MaterialTheme.colorScheme.primary
+                R.drawable.ic_linked_camera_24dp to MaterialTheme.colorScheme.primary
 
-            is DeviceConnectionState.Error -> Icons.Rounded.Error to MaterialTheme.colorScheme.error
+            is DeviceConnectionState.Error ->
+                R.drawable.ic_error_24dp to MaterialTheme.colorScheme.error
         }
 
     val animatedColor by animateColorAsState(targetValue = color, label = "status_color")
 
-    Box(
-        modifier =
-            Modifier.size(40.dp).clip(CircleShape).background(animatedColor.copy(alpha = 0.15f)),
-        contentAlignment = Alignment.Center,
-    ) {
-        val infiniteTransition = rememberInfiniteTransition(label = "icon_animation")
+    Crossfade(state) {
+        Box(
+            modifier =
+                Modifier.size(40.dp)
+                    .clip(CircleShape)
+                    .background(animatedColor.copy(alpha = 0.15f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            val infiniteTransition = rememberInfiniteTransition(label = "icon_animation")
 
-        when (state) {
-            is DeviceConnectionState.Searching -> {
-                val angle by
-                    infiniteTransition.animateFloat(
-                        initialValue = 0f,
-                        targetValue = 360f,
-                        animationSpec =
-                            InfiniteRepeatableSpec(
-                                animation = tween(1500, easing = LinearEasing),
-                                repeatMode = RepeatMode.Restart,
-                            ),
-                        label = "searching_rotation",
-                    )
+            when (it) {
+                is DeviceConnectionState.Searching ->
+                    SearchingAnimatedIcon(infiniteTransition, icon, animatedColor)
 
-                // Move in a small circle
-                val radius = 2.dp
-                val x = radius * cos(angle.toDouble() * (PI / 180.0)).toFloat()
-                val y = radius * sin(angle.toDouble() * (PI / 180.0)).toFloat()
+                is DeviceConnectionState.Connecting ->
+                    ConnectingAnimatedIcon(infiniteTransition, icon, animatedColor)
 
-                Icon(
-                    icon,
-                    contentDescription = null,
-                    tint = animatedColor,
-                    modifier = Modifier.offset(x = x, y = y),
-                )
-            }
+                is DeviceConnectionState.Syncing -> SyncingAnimatedIcon(animatedColor)
 
-            is DeviceConnectionState.Connecting -> {
-                val alpha by
-                    infiniteTransition.animateFloat(
-                        initialValue = 0.3f,
-                        targetValue = 1f,
-                        animationSpec =
-                            InfiniteRepeatableSpec(
-                                animation = tween(800, easing = EaseInOut),
-                                repeatMode = RepeatMode.Reverse,
-                            ),
-                        label = "connecting_blink",
-                    )
-
-                Icon(
-                    icon,
-                    contentDescription = null,
-                    tint = animatedColor,
-                    modifier = Modifier.alpha(alpha),
-                )
-            }
-
-            is DeviceConnectionState.Syncing -> {
-                val rotation by
-                    infiniteTransition.animateFloat(
-                        initialValue = 0f,
-                        targetValue = 360f,
-                        animationSpec =
-                            InfiniteRepeatableSpec(
-                                animation = tween(1500, easing = LinearEasing),
-                                repeatMode = RepeatMode.Restart,
-                            ),
-                        label = "syncing_rotation",
-                    )
-
-                Icon(
-                    icon,
-                    contentDescription = null,
-                    tint = animatedColor,
-                    modifier = Modifier.rotate(rotation),
-                )
-            }
-
-            else -> {
-                Icon(icon, contentDescription = null, tint = animatedColor)
+                else -> Icon(painterResource(icon), contentDescription = null, tint = animatedColor)
             }
         }
+    }
+}
+
+@Composable
+private fun SearchingAnimatedIcon(
+    infiniteTransition: InfiniteTransition,
+    icon: Int,
+    animatedColor: Color,
+) {
+    val angle by
+        infiniteTransition.animateFloat(
+            initialValue = 0f,
+            targetValue = 360f,
+            animationSpec =
+                InfiniteRepeatableSpec(
+                    animation = tween(1500, easing = LinearEasing),
+                    repeatMode = RepeatMode.Restart,
+                ),
+            label = "searching_rotation",
+        )
+
+    // Move in a small circle
+    val radius = 2.dp
+    val x = radius * cos(angle.toDouble() * (PI / 180.0)).toFloat()
+    val y = radius * sin(angle.toDouble() * (PI / 180.0)).toFloat()
+
+    Icon(
+        painterResource(icon),
+        contentDescription = null,
+        tint = animatedColor,
+        modifier = Modifier.offset(x = x, y = y),
+    )
+}
+
+@Composable
+private fun ConnectingAnimatedIcon(
+    infiniteTransition: InfiniteTransition,
+    icon: Int,
+    animatedColor: Color,
+) {
+    val alpha by
+        infiniteTransition.animateFloat(
+            initialValue = 0.3f,
+            targetValue = 1f,
+            animationSpec =
+                InfiniteRepeatableSpec(
+                    animation = tween(800, easing = EaseInOut),
+                    repeatMode = RepeatMode.Reverse,
+                ),
+            label = "connecting_blink",
+        )
+
+    Icon(
+        painterResource(icon),
+        contentDescription = null,
+        tint = animatedColor,
+        modifier = Modifier.alpha(alpha),
+    )
+}
+
+@OptIn(ExperimentalAnimationGraphicsApi::class)
+@Composable
+private fun SyncingAnimatedIcon(animatedColor: Color, modifier: Modifier = Modifier) {
+    // Use the animated vector drawable for wave animation
+    // Since Compose AVD API suck, and we can't have an infinite loop, we hack around it
+    // by alternating two identical animations; the visible one plays forward while the
+    // invisible one plays backwards.
+    val image1 = AnimatedImageVector.animatedVectorResource(R.drawable.avd_syncing_waves)
+    val image2 = AnimatedImageVector.animatedVectorResource(R.drawable.avd_syncing_waves)
+    var useFirstImage by remember { mutableStateOf(false) }
+
+    // Automatically toggle the animation state to keep it looping
+    LaunchedEffect(Unit) {
+        useFirstImage = true
+        while (true) {
+            delay(2000.milliseconds) // Total animation duration
+            useFirstImage = !useFirstImage
+        }
+    }
+
+    val avd1 = rememberAnimatedVectorPainter(image1, useFirstImage)
+    val avd2 = rememberAnimatedVectorPainter(image2, !useFirstImage)
+
+    Box(modifier) {
+        // We need to keep both in composition or the animation will not run
+        Icon(
+            painter = avd1,
+            contentDescription = null,
+            tint = animatedColor,
+            modifier = Modifier.alpha(if (useFirstImage) 1f else 0f),
+        )
+        Icon(
+            painter = avd2,
+            contentDescription = null,
+            tint = animatedColor,
+            modifier = Modifier.alpha(if (useFirstImage) 0f else 1f),
+        )
     }
 }
 
@@ -644,7 +688,7 @@ private fun SyncStoppedWarning(
     ) {
         Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(
-                Icons.Rounded.BluetoothDisabled,
+                painterResource(R.drawable.ic_bluetooth_disabled_24dp),
                 contentDescription = null,
                 modifier = Modifier.size(24.dp),
             )
@@ -660,7 +704,10 @@ private fun SyncStoppedWarning(
             }
 
             IconButton(onClick = onRefreshClick, enabled = enabled) {
-                Icon(Icons.Rounded.Refresh, contentDescription = "Resume searching")
+                Icon(
+                    painterResource(R.drawable.ic_refresh_24dp),
+                    contentDescription = "Resume searching",
+                )
             }
         }
     }

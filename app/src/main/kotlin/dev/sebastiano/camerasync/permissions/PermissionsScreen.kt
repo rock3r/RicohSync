@@ -19,11 +19,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.LocationOn
-import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.rounded.Bluetooth
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedButton
@@ -47,10 +42,12 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import dev.sebastiano.camerasync.PermissionInfo
 import dev.sebastiano.camerasync.PermissionsRequester
+import dev.sebastiano.camerasync.R
 
 @Composable
 fun PermissionsScreen(onPermissionsGranted: () -> Unit) {
@@ -211,13 +208,18 @@ private fun PermissionChecklistItem(permission: PermissionInfo, modifier: Modifi
         ) {
             val icon =
                 when (permission.name) {
-                    "Location" -> Icons.Default.LocationOn
+                    "Location" -> R.drawable.ic_location_on_24dp
                     "Bluetooth Scan",
-                    "Bluetooth Connect" -> Icons.Rounded.Bluetooth
-                    "Notifications" -> Icons.Default.Notifications
-                    else -> Icons.Rounded.Bluetooth
+                    "Bluetooth Connect" -> R.drawable.ic_bluetooth_24dp
+                    "Notifications" -> R.drawable.ic_notifications_24dp
+                    else -> R.drawable.ic_select_check_box_24dp
                 }
-            Icon(icon, contentDescription = null, tint = iconColor, modifier = Modifier.size(24.dp))
+            Icon(
+                painterResource(icon),
+                contentDescription = null,
+                tint = iconColor,
+                modifier = Modifier.size(24.dp),
+            )
         }
 
         // Permission info
@@ -244,7 +246,7 @@ private fun PermissionChecklistItem(permission: PermissionInfo, modifier: Modifi
             ) { isGranted ->
                 if (isGranted) {
                     Icon(
-                        Icons.Default.CheckCircle,
+                        painterResource(R.drawable.ic_check_circle_24dp),
                         contentDescription = "Granted",
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.scale(checkmarkScale),

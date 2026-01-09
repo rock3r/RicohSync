@@ -30,14 +30,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.rounded.Bluetooth
-import androidx.compose.material.icons.rounded.CameraAlt
-import androidx.compose.material.icons.rounded.Error
-import androidx.compose.material.icons.rounded.Refresh
-import androidx.compose.material.icons.rounded.Settings
-import androidx.compose.material.icons.rounded.Stop
 import androidx.compose.material3.Button
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -63,12 +55,14 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import dev.sebastiano.camerasync.R
 import dev.sebastiano.camerasync.domain.model.Camera
 import dev.sebastiano.camerasync.ui.theme.CameraSyncTheme
 import dev.sebastiano.camerasync.ui.theme.DarkElectricBlue
@@ -108,7 +102,7 @@ fun PairingScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, "Back")
+                        Icon(painterResource(R.drawable.ic_arrow_back_24dp), "Back")
                     }
                 },
             )
@@ -121,7 +115,9 @@ fun PairingScreen(
                 }
             ) {
                 Icon(
-                    if (isScanning) Icons.Rounded.Stop else Icons.Rounded.Refresh,
+                    painterResource(
+                        if (isScanning) R.drawable.ic_stop_24dp else R.drawable.ic_refresh_24dp
+                    ),
                     contentDescription = if (isScanning) "Stop scanning" else "Start scanning",
                 )
             }
@@ -145,7 +141,6 @@ fun PairingScreen(
                 is PairingScreenState.AlreadyBonded -> {
                     AlreadyBondedContent(
                         modifier = Modifier.fillMaxSize(),
-                        camera = currentState.camera,
                         removeFailed = currentState.removeFailed,
                         onRemoveBond = { viewModel.removeBondAndRetry(currentState.camera) },
                         onCancel = { viewModel.cancelPairing() },
@@ -268,7 +263,7 @@ private fun ScanningActiveState() {
 private fun ScanningStoppedState() {
     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(32.dp)) {
         Icon(
-            Icons.Rounded.Bluetooth,
+            painterResource(R.drawable.ic_bluetooth_searching_24dp),
             contentDescription = null,
             modifier = Modifier.size(64.dp),
             tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
@@ -368,7 +363,6 @@ private fun DeviceInfoColumn(camera: Camera, modifier: Modifier = Modifier) {
 @Composable
 private fun AlreadyBondedContent(
     modifier: Modifier = Modifier,
-    camera: Camera,
     removeFailed: Boolean,
     onRemoveBond: () -> Unit,
     onCancel: () -> Unit,
@@ -379,7 +373,7 @@ private fun AlreadyBondedContent(
             modifier = Modifier.padding(32.dp),
         ) {
             Icon(
-                Icons.Rounded.Settings,
+                painterResource(R.drawable.ic_settings_24dp),
                 contentDescription = null,
                 modifier = Modifier.size(64.dp),
                 tint = MaterialTheme.colorScheme.primary,
@@ -473,7 +467,7 @@ private fun PairingFailed(error: PairingError, onCancel: () -> Unit, onRetry: ()
             contentAlignment = Alignment.Center,
         ) {
             Icon(
-                Icons.Rounded.Error,
+                painterResource(R.drawable.ic_error_24dp),
                 contentDescription = null,
                 modifier = Modifier.size(48.dp),
                 tint = MaterialTheme.colorScheme.error,
@@ -568,7 +562,7 @@ private fun PairingInProgress(deviceName: String, onCancel: () -> Unit) {
                 color = MaterialTheme.colorScheme.primary,
             )
             Icon(
-                Icons.Rounded.Bluetooth,
+                painterResource(R.drawable.ic_bluetooth_searching_24dp),
                 contentDescription = null,
                 modifier = Modifier.rotate(rotation).size(40.dp),
                 tint = MaterialTheme.colorScheme.primary,
@@ -657,7 +651,7 @@ private fun PulsingBluetoothIcon(size: Dp, iconSize: Dp) {
         contentAlignment = Alignment.Center,
     ) {
         Icon(
-            Icons.Rounded.Bluetooth,
+            painterResource(R.drawable.ic_bluetooth_searching_24dp),
             contentDescription = null,
             modifier = Modifier.size(iconSize),
             tint = MaterialTheme.colorScheme.primary,
@@ -711,7 +705,7 @@ private fun RadioWaveBluetoothIcon(size: Dp, iconSize: Dp) {
 
         // Static Bluetooth icon
         Icon(
-            Icons.Rounded.Bluetooth,
+            painterResource(R.drawable.ic_bluetooth_searching_24dp),
             contentDescription = null,
             modifier = Modifier.size(iconSize),
             tint = MaterialTheme.colorScheme.primary,
@@ -738,7 +732,7 @@ private fun PulsingCameraIcon(size: Dp, iconSize: Dp, alpha: Float) {
         contentAlignment = Alignment.Center,
     ) {
         Icon(
-            Icons.Rounded.CameraAlt,
+            painterResource(R.drawable.ic_photo_camera_24dp),
             contentDescription = null,
             modifier = Modifier.size(iconSize),
             tint = MaterialTheme.colorScheme.onPrimaryContainer,
@@ -756,7 +750,7 @@ private fun PulsingErrorIcon(alpha: Float) {
         contentAlignment = Alignment.Center,
     ) {
         Icon(
-            Icons.Rounded.Error,
+            painterResource(R.drawable.ic_error_24dp),
             contentDescription = null,
             modifier = Modifier.size(48.dp),
             tint = MaterialTheme.colorScheme.error,
@@ -812,7 +806,7 @@ private fun PairingProgressIndicator() {
             color = MaterialTheme.colorScheme.primary,
         )
         Icon(
-            Icons.Rounded.Bluetooth,
+            painterResource(R.drawable.ic_bluetooth_searching_24dp),
             contentDescription = null,
             modifier = Modifier.rotate(rotation).size(40.dp),
             tint = MaterialTheme.colorScheme.primary,
