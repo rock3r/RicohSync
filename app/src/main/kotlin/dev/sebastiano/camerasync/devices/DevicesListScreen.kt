@@ -60,6 +60,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -72,6 +73,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -79,11 +81,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import dev.sebastiano.camerasync.R
 import dev.sebastiano.camerasync.devicesync.formatElapsedTimeSince
 import dev.sebastiano.camerasync.domain.model.DeviceConnectionState
 import dev.sebastiano.camerasync.domain.model.GpsLocation
 import dev.sebastiano.camerasync.domain.model.PairedDeviceWithState
+import dev.sebastiano.camerasync.util.BatteryOptimizationUtil
 import java.time.ZonedDateTime
 import kotlin.math.PI
 import kotlin.math.cos
@@ -118,6 +124,19 @@ import org.maplibre.spatialk.geojson.Position
 fun DevicesListScreen(viewModel: DevicesListViewModel, onAddDeviceClick: () -> Unit) {
     val state by viewModel.state
     var deviceToUnpair by remember { mutableStateOf<PairedDeviceWithState?>(null) }
+    var showBatteryOptimizationDialog by remember { mutableStateOf(false) }
+
+    // Refresh battery optimization status when returning from settings
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                viewModel.checkBatteryOptimizationStatus()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -176,6 +195,13 @@ fun DevicesListScreen(viewModel: DevicesListViewModel, onAddDeviceClick: () -> U
                             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
                         )
 
+                        if (!currentState.isIgnoringBatteryOptimizations) {
+                            BatteryOptimizationWarning(
+                                onEnableClick = { showBatteryOptimizationDialog = true },
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                            )
+                        }
+
                         if (!currentState.isSyncEnabled) {
                             SyncStoppedWarning(
                                 onRefreshClick = { viewModel.refreshConnections() },
@@ -220,6 +246,14 @@ fun DevicesListScreen(viewModel: DevicesListViewModel, onAddDeviceClick: () -> U
                 deviceToUnpair = null
             },
             onDismiss = { deviceToUnpair = null },
+        )
+    }
+
+    // Battery optimization dialog
+    if (showBatteryOptimizationDialog) {
+        BatteryOptimizationDialog(
+            onConfirm = { showBatteryOptimizationDialog = false },
+            onDismiss = { showBatteryOptimizationDialog = false },
         )
     }
 }
@@ -669,6 +703,148 @@ private fun UnpairConfirmationDialog(
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )
+}
+
+@Composable
+private fun BatteryOptimizationDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    val context = LocalContext.current
+    var showError by remember { mutableStateOf(false) }
+    val hasOemSettings = remember {
+        BatteryOptimizationUtil.hasOemBatteryOptimizationSettings(context)
+    }
+
+    if (showError) {
+        AlertDialog(
+            onDismissRequest = {
+                showError = false
+                onDismiss()
+            },
+            title = { Text("Unable to open settings") },
+            text = {
+                Text(
+                    "Could not open battery optimization settings. Please navigate to " +
+                        "Settings > Apps > CameraSync > Battery to disable battery optimization manually."
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showError = false
+                        onDismiss()
+                    }
+                ) {
+                    Text("OK")
+                }
+            },
+        )
+    } else {
+        AlertDialog(
+            onDismissRequest = onDismiss,
+            title = { Text("Disable battery optimization") },
+            text = {
+                Column {
+                    Text(
+                        "CameraSync needs to run in the background to sync GPS data to your cameras. " +
+                            "Battery optimization can interfere with background operation and Bluetooth connections."
+                    )
+
+                    if (hasOemSettings) {
+                        Spacer(Modifier.height(12.dp))
+                        Text(
+                            "Your device has manufacturer-specific battery settings that may also need to be configured.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
+
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        "Please select \"Don't optimize\" or \"Allow\" on the next screen to ensure reliable syncing."
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        try {
+                            val intent =
+                                BatteryOptimizationUtil.createBatteryOptimizationSettingsIntent(
+                                    context
+                                )
+                            context.startActivity(intent)
+                            onConfirm()
+                        } catch (_: Exception) {
+                            // If launching the intent fails, show an error dialog with manual
+                            // instructions
+                            showError = true
+                        }
+                    }
+                ) {
+                    Text("Open Settings")
+                }
+            },
+            dismissButton = {
+                if (hasOemSettings) {
+                    TextButton(
+                        onClick = {
+                            try {
+                                val oemIntent =
+                                    BatteryOptimizationUtil.getOemBatteryOptimizationIntent(context)
+                                if (oemIntent != null) {
+                                    context.startActivity(oemIntent)
+                                    onConfirm()
+                                } else {
+                                    showError = true
+                                }
+                            } catch (_: Exception) {
+                                showError = true
+                            }
+                        }
+                    ) {
+                        Text("OEM Settings")
+                    }
+                } else {
+                    TextButton(onClick = onDismiss) { Text("Not now") }
+                }
+            },
+        )
+    }
+}
+
+@Composable
+private fun BatteryOptimizationWarning(onEnableClick: () -> Unit, modifier: Modifier = Modifier) {
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.medium,
+        colors =
+            CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+            ),
+    ) {
+        Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                painterResource(R.drawable.ic_error_24dp),
+                contentDescription = null,
+                modifier = Modifier.size(24.dp),
+            )
+
+            Spacer(Modifier.width(16.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Battery optimization active",
+                    style = MaterialTheme.typography.titleSmall,
+                )
+                Text(
+                    text = "Background sync may be unreliable.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+
+            TextButton(onClick = onEnableClick) { Text("Disable") }
+        }
+    }
 }
 
 @Composable

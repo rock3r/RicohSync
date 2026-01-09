@@ -3,6 +3,7 @@ package dev.sebastiano.camerasync.devices
 import android.content.Context
 import dev.sebastiano.camerasync.CameraSyncApp
 import dev.sebastiano.camerasync.domain.model.PairedDevice
+import dev.sebastiano.camerasync.fakes.FakeBatteryOptimizationChecker
 import dev.sebastiano.camerasync.fakes.FakeBluetoothBondingChecker
 import dev.sebastiano.camerasync.fakes.FakeKhronicleLogger
 import dev.sebastiano.camerasync.fakes.FakeLocationRepository
@@ -33,6 +34,7 @@ class DevicesListViewModelTest {
     private lateinit var locationRepository: FakeLocationRepository
     private lateinit var vendorRegistry: FakeVendorRegistry
     private lateinit var bluetoothBondingChecker: FakeBluetoothBondingChecker
+    private lateinit var batteryOptimizationChecker: FakeBatteryOptimizationChecker
     private lateinit var viewModel: DevicesListViewModel
     private val testDispatcher = UnconfinedTestDispatcher()
 
@@ -48,6 +50,7 @@ class DevicesListViewModelTest {
         locationRepository = FakeLocationRepository()
         vendorRegistry = FakeVendorRegistry()
         bluetoothBondingChecker = FakeBluetoothBondingChecker()
+        batteryOptimizationChecker = FakeBatteryOptimizationChecker()
 
         viewModel =
             DevicesListViewModel(
@@ -56,6 +59,7 @@ class DevicesListViewModelTest {
                 bindingContextProvider = { mockContext() },
                 vendorRegistry = vendorRegistry,
                 bluetoothBondingChecker = bluetoothBondingChecker,
+                batteryOptimizationChecker = batteryOptimizationChecker,
                 ioDispatcher = testDispatcher, // Inject test dispatcher for IO operations
             )
     }
@@ -267,6 +271,117 @@ class DevicesListViewModelTest {
             assertTrue(displayInfo1!!.showPairingName)
             assertTrue(displayInfo2!!.showPairingName)
             assertFalse(displayInfo3!!.showPairingName)
+        }
+
+    @Test
+    fun `battery optimization status is included in HasDevices state when ignoring optimizations`() =
+        runTest {
+            batteryOptimizationChecker.setIgnoringBatteryOptimizations(true)
+
+            val device =
+                PairedDevice(
+                    macAddress = "AA:BB:CC:DD:EE:FF",
+                    name = "GR IIIx",
+                    vendorId = "fake",
+                    isEnabled = true,
+                )
+
+            pairedDevicesRepository.addTestDevice(device)
+            advanceUntilIdle()
+
+            val state = viewModel.state.value
+            assertTrue(state is DevicesListState.HasDevices)
+            val hasDevicesState = state as DevicesListState.HasDevices
+
+            assertTrue(
+                "Should be ignoring battery optimizations",
+                hasDevicesState.isIgnoringBatteryOptimizations,
+            )
+        }
+
+    @Test
+    fun `battery optimization status is included in HasDevices state when not ignoring optimizations`() =
+        runTest {
+            // Need to recreate the ViewModel after changing the battery optimization status
+            // because the status is captured during initialization
+            batteryOptimizationChecker.setIgnoringBatteryOptimizations(false)
+
+            val testViewModel =
+                DevicesListViewModel(
+                    pairedDevicesRepository = pairedDevicesRepository,
+                    locationRepository = locationRepository,
+                    bindingContextProvider = { mockContext() },
+                    vendorRegistry = vendorRegistry,
+                    bluetoothBondingChecker = bluetoothBondingChecker,
+                    batteryOptimizationChecker = batteryOptimizationChecker,
+                    ioDispatcher = testDispatcher,
+                )
+
+            val device =
+                PairedDevice(
+                    macAddress = "AA:BB:CC:DD:EE:FF",
+                    name = "GR IIIx",
+                    vendorId = "fake",
+                    isEnabled = true,
+                )
+
+            pairedDevicesRepository.addTestDevice(device)
+            advanceUntilIdle()
+
+            val state = testViewModel.state.value
+            assertTrue(state is DevicesListState.HasDevices)
+            val hasDevicesState = state as DevicesListState.HasDevices
+
+            assertFalse(
+                "Should not be ignoring battery optimizations",
+                hasDevicesState.isIgnoringBatteryOptimizations,
+            )
+        }
+
+    @Test
+    fun `checkBatteryOptimizationStatus updates state when battery optimization changes`() =
+        runTest {
+            // Start with battery optimization disabled (ignoring = true)
+            batteryOptimizationChecker.setIgnoringBatteryOptimizations(true)
+
+            val device =
+                PairedDevice(
+                    macAddress = "AA:BB:CC:DD:EE:FF",
+                    name = "GR IIIx",
+                    vendorId = "fake",
+                    isEnabled = true,
+                )
+
+            pairedDevicesRepository.addTestDevice(device)
+            advanceUntilIdle()
+
+            val initialState = viewModel.state.value as DevicesListState.HasDevices
+            assertTrue(
+                "Initially should be ignoring battery optimizations",
+                initialState.isIgnoringBatteryOptimizations,
+            )
+
+            // Simulate user disabling the exemption (turning battery optimization back on)
+            batteryOptimizationChecker.setIgnoringBatteryOptimizations(false)
+            viewModel.checkBatteryOptimizationStatus()
+            advanceUntilIdle()
+
+            val updatedState = viewModel.state.value as DevicesListState.HasDevices
+            assertFalse(
+                "After check, should not be ignoring battery optimizations",
+                updatedState.isIgnoringBatteryOptimizations,
+            )
+
+            // Simulate user enabling the exemption again (disabling battery optimization)
+            batteryOptimizationChecker.setIgnoringBatteryOptimizations(true)
+            viewModel.checkBatteryOptimizationStatus()
+            advanceUntilIdle()
+
+            val finalState = viewModel.state.value as DevicesListState.HasDevices
+            assertTrue(
+                "After second check, should be ignoring battery optimizations again",
+                finalState.isIgnoringBatteryOptimizations,
+            )
         }
 
     private fun mockContext(): Context {

@@ -31,6 +31,51 @@
     <uses-permission
         android:name="android.permission.FOREGROUND_SERVICE"
         tools:ignore="ForegroundServicesPolicy" />
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+
+    <queries>
+        <!-- Battery optimization settings intents -->
+        <intent>
+            <action android:name="android.settings.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+            <data android:scheme="package" />
+        </intent>
+        <intent>
+            <action android:name="android.settings.IGNORE_BATTERY_OPTIMIZATION_SETTINGS" />
+        </intent>
+
+        <!-- OEM-specific battery optimization settings -->
+        <!-- Xiaomi MIUI -->
+        <package android:name="com.miui.securitycenter" />
+        <!-- Huawei -->
+        <package android:name="com.huawei.systemmanager" />
+        <!-- Oppo ColorOS -->
+        <package android:name="com.coloros.safecenter" />
+        <package android:name="com.color.safecenter" />
+        <package android:name="com.oppo.safe" />
+        <!-- Samsung -->
+        <package android:name="com.samsung.android.sm_cn" />
+        <package android:name="com.samsung.android.lool" />
+        <!-- iQOO -->
+        <package android:name="com.iqoo.secure" />
+        <!-- Vivo -->
+        <package android:name="com.vivo.abe" />
+        <!-- HTC -->
+        <package android:name="com.htc.pitroad" />
+        <!-- Asus -->
+        <package android:name="com.asus.mobilemanager" />
+        <!-- Meizu -->
+        <package android:name="com.meizu.safe" />
+        <!-- ZTE -->
+        <package android:name="com.zte.heartyservice" />
+        <!-- Lenovo -->
+        <package android:name="com.lenovo.security" />
+        <!-- Coolpad -->
+        <package android:name="com.yulong.android.security" />
+        <!-- LeTV -->
+        <package android:name="com.letv.android.letvsafe" />
+        <!-- Gionee -->
+        <package android:name="com.gionee.softmanager" />
+    </queries>
 
     <application
         android:name="dev.sebastiano.camerasync.CameraSyncApp"

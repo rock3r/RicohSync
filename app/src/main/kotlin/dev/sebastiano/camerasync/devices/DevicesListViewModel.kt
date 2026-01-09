@@ -19,6 +19,8 @@ import dev.sebastiano.camerasync.domain.repository.LocationRepository
 import dev.sebastiano.camerasync.domain.repository.PairedDevicesRepository
 import dev.sebastiano.camerasync.domain.vendor.CameraVendorRegistry
 import dev.sebastiano.camerasync.pairing.BluetoothBondingChecker
+import dev.sebastiano.camerasync.util.AndroidBatteryOptimizationChecker
+import dev.sebastiano.camerasync.util.BatteryOptimizationChecker
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -44,6 +46,8 @@ class DevicesListViewModel(
     private val bindingContextProvider: () -> Context,
     private val vendorRegistry: CameraVendorRegistry,
     private val bluetoothBondingChecker: BluetoothBondingChecker,
+    private val batteryOptimizationChecker: BatteryOptimizationChecker =
+        AndroidBatteryOptimizationChecker(),
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
 ) : ViewModel() {
 
@@ -55,6 +59,7 @@ class DevicesListViewModel(
     private val deviceStatesFromService =
         MutableStateFlow<Map<String, DeviceConnectionState>>(emptyMap())
     private val isScanningFromService = MutableStateFlow(false)
+    private val batteryOptimizationStatus = MutableStateFlow(false)
     private var stateCollectionJob: Job? = null
     private var scanningCollectionJob: Job? = null
 
@@ -62,6 +67,7 @@ class DevicesListViewModel(
         observeDevices()
         bindToService()
         locationRepository.startLocationUpdates()
+        checkBatteryOptimizationStatus()
     }
 
     private fun observeDevices() {
@@ -72,12 +78,22 @@ class DevicesListViewModel(
                     isScanningFromService,
                     pairedDevicesRepository.isSyncEnabled,
                     locationRepository.locationUpdates,
-                ) { pairedDevices, connectionStates, isScanning, isSyncEnabled, currentLocation ->
+                    batteryOptimizationStatus,
+                ) { flows ->
+                    val pairedDevices = flows[0] as List<*>
+                    @Suppress("UNCHECKED_CAST")
+                    val connectionStates = flows[1] as Map<String, DeviceConnectionState>
+                    val isScanning = flows[2] as Boolean
+                    val isSyncEnabled = flows[3] as Boolean
+                    val currentLocation = flows[4] as GpsLocation?
+                    val isIgnoringBatteryOptimizations = flows[5] as Boolean
+
                     if (pairedDevices.isEmpty()) {
                         DevicesListState.Empty
                     } else {
                         val devicesWithState =
                             pairedDevices.map { device ->
+                                device as PairedDevice
                                 val connectionState =
                                     when {
                                         !device.isEnabled -> DeviceConnectionState.Disabled
@@ -95,10 +111,20 @@ class DevicesListViewModel(
                             isScanning = isScanning,
                             isSyncEnabled = isSyncEnabled,
                             currentLocation = currentLocation,
+                            isIgnoringBatteryOptimizations = isIgnoringBatteryOptimizations,
                         )
                     }
                 }
                 .collect { newState -> _state.value = newState }
+        }
+    }
+
+    /** Checks and updates the battery optimization status. Call when returning from settings. */
+    fun checkBatteryOptimizationStatus() {
+        viewModelScope.launch(ioDispatcher) {
+            val context = bindingContextProvider()
+            val isIgnoring = batteryOptimizationChecker.isIgnoringBatteryOptimizations(context)
+            batteryOptimizationStatus.value = isIgnoring
         }
     }
 
@@ -283,5 +309,6 @@ sealed interface DevicesListState {
         val isScanning: Boolean = false,
         val isSyncEnabled: Boolean = true,
         val currentLocation: GpsLocation? = null,
+        val isIgnoringBatteryOptimizations: Boolean = true,
     ) : DevicesListState
 }

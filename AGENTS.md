@@ -45,6 +45,14 @@ This is an Android project built with:
 - `PairingScreen`: BLE scanning and pairing flow for new devices
 - Material 3 design with animated connection status indicators
 
+### Utility Layer
+- `BatteryOptimizationUtil`: Utility for checking battery optimization status and creating intents to system settings
+  - Supports standard Android battery optimization settings
+  - Detects and provides intents for OEM-specific battery settings (Xiaomi, Huawei, Oppo, Samsung, etc.)
+  - Uses two-step verification to avoid false positives on package detection
+- `BatteryOptimizationChecker`: Injectable interface for battery optimization checks (with `AndroidBatteryOptimizationChecker` implementation)
+  - Allows mocking in tests via `FakeBatteryOptimizationChecker`
+
 ## Development Guidelines
 
 ### Code Style
@@ -62,6 +70,7 @@ This is an Android project built with:
 5. **Background Sync**: Maintains synchronization via a Foreground Service.
 6. **GPS & Time Sync**: Real-time location and timestamp synchronization.
 7. **Manual Control**: Notification actions to "Refresh" (restart sync) or "Stop All" (persistent stop).
+8. **Battery Optimization Warnings**: Proactive UI warnings when battery optimizations are enabled, with direct links to disable them (including OEM-specific settings).
 
 ### Testing
 - Unit tests use coroutine test dispatchers with `TestScope`
@@ -154,6 +163,32 @@ By injecting the dispatcher, tests can pass `UnconfinedTestDispatcher()` or `Sta
 - Location permissions are critical for GPS sync functionality
 - BLE permissions required for camera communication
 - Location collection runs at 60-second intervals when devices are connected
+
+### Battery Optimization
+
+The app displays a warning card when battery optimizations are active, as they can interfere with:
+- Background BLE connections to cameras
+- Foreground service reliability
+- Location updates
+
+**Implementation Details:**
+- `DevicesListViewModel` monitors battery optimization status via a reactive flow
+- Status is automatically refreshed when the app resumes (using lifecycle observers)
+- UI shows a warning card with a button to open system settings
+- Supports both standard Android settings and OEM-specific battery management screens
+- OEM detection uses package verification to avoid false positives (checks package existence + activity resolution)
+- Multi-layer fallback: Direct request → General settings → OEM settings → Manual instructions
+
+**Supported OEM Battery Settings:**
+- Xiaomi (MIUI)
+- Huawei
+- Oppo/ColorOS (multiple versions)
+- Samsung (China & Global)
+- iQOO, Vivo, HTC, Asus, Meizu, ZTE, Lenovo, Coolpad, LeTV, Gionee
+
+**Required Permissions:**
+- `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` in AndroidManifest.xml
+- Corresponding `<queries>` declarations for package visibility (Android 11+)
 
 ## License
 
