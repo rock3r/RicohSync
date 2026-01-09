@@ -98,12 +98,9 @@ $RECYCLE.BIN/
 # Avoid ignoring Gradle wrapper jar file (.jar files are usually ignored)
 !gradle-wrapper.jar
 
-# Ignore IJP temp folder
-/.intellijPlatform
-
-# Ignore release patch generator output
-/this-release.txt
-
 # Ignore Kotlin compiler sessions
 /.kotlin
-/buildSrc/.kotlin
+
+# Avoid leaking keystores
+*.jks
+keystore.properties
