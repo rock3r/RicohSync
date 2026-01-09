@@ -12,6 +12,7 @@ import com.juul.kable.PlatformAdvertisement
 import com.juul.kable.Scanner
 import com.juul.kable.logs.Logging
 import com.juul.khronicle.Log
+import dev.sebastiano.camerasync.ble.buildManufacturerDataMap
 import dev.sebastiano.camerasync.domain.model.Camera
 import dev.sebastiano.camerasync.domain.vendor.CameraVendorRegistry
 import dev.sebastiano.camerasync.logging.KhronicleLogEngine
@@ -107,11 +108,20 @@ internal class ScanningViewModel(private val vendorRegistry: CameraVendorRegistr
      * @return A Camera instance if a vendor is recognized, or null if no vendor matches.
      */
     private fun PlatformAdvertisement.toCamera(): Camera? {
+        // Build manufacturer data map from the advertisement
+        val mfrData = buildManufacturerDataMap()
+
         val vendor =
-            vendorRegistry.identifyVendor(deviceName = peripheralName ?: name, serviceUuids = uuids)
+            vendorRegistry.identifyVendor(
+                deviceName = peripheralName ?: name,
+                serviceUuids = uuids,
+                manufacturerData = mfrData,
+            )
 
         if (vendor == null) {
-            Log.warn(tag = TAG) { "No vendor recognized for device: ${peripheralName ?: name}" }
+            Log.warn(tag = TAG) {
+                "No vendor recognized for device: ${peripheralName ?: name} (services: $uuids, mfr: ${mfrData.keys})"
+            }
             return null
         }
 

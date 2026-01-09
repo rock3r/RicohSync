@@ -44,8 +44,13 @@ object SonyGattSpec : CameraGattSpec {
     /** Pairing Service UUID. */
     val PAIRING_SERVICE_UUID: Uuid = Uuid.parse("8000EE00-EE00-FFFF-FFFF-FFFFFFFFFFFF")
 
-    /** Pairing Characteristic (EE01) - write pairing initialization data. */
-    val PAIRING_CHARACTERISTIC_UUID: Uuid = Uuid.parse("8000EE01-EE01-FFFF-FFFF-FFFFFFFFFFFF")
+    /**
+     * Pairing Characteristic (EE01) - write pairing initialization data.
+     *
+     * Note: While Sony services use a custom UUID format (8000xxxx-xxxx-FFFF-FFFF-FFFFFFFFFFFF),
+     * the characteristics within those services use the standard Bluetooth SIG base UUID format.
+     */
+    val PAIRING_CHARACTERISTIC_UUID: Uuid = Uuid.parse("0000EE01-0000-1000-8000-00805f9b34fb")
 
     override val scanFilterServiceUuids: List<Uuid> =
         listOf(REMOTE_CONTROL_SERVICE_UUID, PAIRING_SERVICE_UUID)
@@ -71,4 +76,7 @@ object SonyGattSpec : CameraGattSpec {
 
     override val locationServiceUuid: Uuid = LOCATION_SERVICE_UUID
     override val locationCharacteristicUuid: Uuid = LOCATION_DATA_WRITE_CHARACTERISTIC_UUID
+
+    override val pairingServiceUuid: Uuid = PAIRING_SERVICE_UUID
+    override val pairingCharacteristicUuid: Uuid = PAIRING_CHARACTERISTIC_UUID
 }

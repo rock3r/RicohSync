@@ -15,6 +15,12 @@ import kotlin.uuid.Uuid
 @OptIn(ExperimentalUuidApi::class)
 object SonyCameraVendor : CameraVendor {
 
+    /** Sony's Bluetooth manufacturer ID (0x012D = 301 decimal). */
+    const val SONY_MANUFACTURER_ID = 0x012D
+
+    /** Device type ID for cameras in Sony's manufacturer data. */
+    private const val DEVICE_TYPE_CAMERA: Short = 0x0003
+
     override val vendorId: String = "sony"
 
     override val vendorName: String = "Sony"
@@ -23,19 +29,27 @@ object SonyCameraVendor : CameraVendor {
 
     override val protocol: CameraProtocol = SonyProtocol
 
-    override fun recognizesDevice(deviceName: String?, serviceUuids: List<Uuid>): Boolean {
-        // Sony cameras using DI Remote Control advertise a specific service UUID
-        val hasSonyService =
-            serviceUuids.any { uuid -> SonyGattSpec.scanFilterServiceUuids.contains(uuid) }
-
-        // If service UUIDs are provided, only recognize if Sony service UUID is present
-        // (Don't trust name matching when service UUIDs are explicitly provided)
-        if (serviceUuids.isNotEmpty()) {
-            return hasSonyService
+    override fun recognizesDevice(
+        deviceName: String?,
+        serviceUuids: List<Uuid>,
+        manufacturerData: Map<Int, ByteArray>,
+    ): Boolean {
+        // Check 1: Sony manufacturer data with camera device type
+        // According to PROTOCOL_EN.md, Sony cameras advertise with manufacturer ID 0x012D
+        // and device type 0x0003 in the first bytes of manufacturer data
+        if (isSonyCamera(manufacturerData)) {
+            return true
         }
 
-        // If no service UUIDs are provided, fall back to name pattern matching
-        // This handles cases where service UUIDs aren't advertised in the scan
+        // Check 2: Sony-specific service UUIDs (Remote Control or Pairing service)
+        val hasSonyService =
+            serviceUuids.any { uuid -> SonyGattSpec.scanFilterServiceUuids.contains(uuid) }
+        if (hasSonyService) {
+            return true
+        }
+
+        // Check 3: Device name pattern matching (ILCE- prefix for Alpha cameras, DSC- for others)
+        // This is a fallback when neither manufacturer data nor service UUIDs are available
         val hasSonyName =
             deviceName?.let { name ->
                 SonyGattSpec.scanFilterDeviceNames.any { prefix ->
@@ -46,6 +60,25 @@ object SonyCameraVendor : CameraVendor {
         return hasSonyName
     }
 
+    /**
+     * Checks if the manufacturer data indicates a Sony camera.
+     *
+     * According to PROTOCOL_EN.md, Sony camera manufacturer data format:
+     * - Bytes 0-1: Device Type ID (0x0003 = Camera, little-endian in raw BLE data)
+     *
+     * Note: The manufacturer ID (0x012D) is the key in the map, already parsed by the BLE stack.
+     */
+    private fun isSonyCamera(manufacturerData: Map<Int, ByteArray>): Boolean {
+        val sonyData = manufacturerData[SONY_MANUFACTURER_ID] ?: return false
+
+        // Need at least 2 bytes for device type
+        if (sonyData.size < 2) return false
+
+        // Device type is in the first 2 bytes (little-endian in raw BLE advertisement)
+        val deviceType = ((sonyData[1].toInt() and 0xFF) shl 8) or (sonyData[0].toInt() and 0xFF)
+        return deviceType.toShort() == DEVICE_TYPE_CAMERA
+    }
+
     override fun getCapabilities(): CameraCapabilities {
         return CameraCapabilities(
             supportsFirmwareVersion = true, // Standard DIS
@@ -53,6 +86,7 @@ object SonyCameraVendor : CameraVendor {
             supportsDateTimeSync = true,
             supportsGeoTagging = false, // No separate toggle; location data includes time
             supportsLocationSync = true,
+            requiresVendorPairing = true, // Sony requires writing to EE01 characteristic
         )
     }
 

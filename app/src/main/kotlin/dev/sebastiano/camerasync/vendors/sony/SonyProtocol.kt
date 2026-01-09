@@ -134,6 +134,10 @@ object SonyProtocol : CameraProtocol {
         return false
     }
 
+    override fun getPairingInitData(): ByteArray {
+        return createPairingInit()
+    }
+
     /**
      * Encodes a complete location packet for Sony cameras.
      *

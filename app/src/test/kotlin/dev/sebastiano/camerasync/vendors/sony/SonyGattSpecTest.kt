@@ -74,9 +74,11 @@ class SonyGattSpecTest {
     }
 
     @Test
-    fun `pairing characteristic UUID matches documentation`() {
+    fun `pairing characteristic UUID uses standard Bluetooth SIG base UUID`() {
+        // Note: While Sony services use a custom UUID format, the characteristics
+        // within those services use the standard Bluetooth SIG base UUID format.
         assertEquals(
-            Uuid.parse("8000EE01-EE01-FFFF-FFFF-FFFFFFFFFFFF"),
+            Uuid.parse("0000EE01-0000-1000-8000-00805f9b34fb"),
             SonyGattSpec.PAIRING_CHARACTERISTIC_UUID,
         )
     }

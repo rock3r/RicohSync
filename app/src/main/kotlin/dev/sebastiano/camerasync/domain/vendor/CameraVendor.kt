@@ -36,10 +36,15 @@ interface CameraVendor {
      *
      * @param deviceName The advertised device name, or null if not available.
      * @param serviceUuids The list of advertised service UUIDs.
+     * @param manufacturerData Map of manufacturer ID to data bytes from the advertisement.
      * @return true if this vendor recognizes the device.
      */
     @OptIn(ExperimentalUuidApi::class)
-    fun recognizesDevice(deviceName: String?, serviceUuids: List<Uuid>): Boolean
+    fun recognizesDevice(
+        deviceName: String?,
+        serviceUuids: List<Uuid>,
+        manufacturerData: Map<Int, ByteArray> = emptyMap(),
+    ): Boolean
 
     /**
      * Returns the device capabilities for this vendor.
@@ -100,6 +105,14 @@ interface CameraGattSpec {
 
     /** Location sync characteristic UUID, or null if not supported. */
     val locationCharacteristicUuid: Uuid?
+
+    /** Pairing service UUID, or null if vendor-specific pairing is not required. */
+    val pairingServiceUuid: Uuid?
+        get() = null
+
+    /** Pairing characteristic UUID, or null if vendor-specific pairing is not required. */
+    val pairingCharacteristicUuid: Uuid?
+        get() = null
 }
 
 /** Handles encoding and decoding of data for a camera vendor's BLE protocol. */
@@ -146,6 +159,13 @@ interface CameraProtocol {
      * @return true if geo-tagging is enabled.
      */
     fun decodeGeoTaggingEnabled(bytes: ByteArray): Boolean
+
+    /**
+     * Returns the data to write for vendor-specific pairing initialization.
+     *
+     * @return The pairing initialization data, or null if vendor-specific pairing is not required.
+     */
+    fun getPairingInitData(): ByteArray? = null
 }
 
 /** Defines the capabilities supported by a camera vendor. */
@@ -164,4 +184,12 @@ data class CameraCapabilities(
 
     /** Whether the camera supports GPS location synchronization. */
     val supportsLocationSync: Boolean = false,
+
+    /**
+     * Whether the camera requires vendor-specific pairing initialization.
+     *
+     * Some vendors (like Sony) require a specific BLE command to be sent after OS-level bonding to
+     * complete the pairing process.
+     */
+    val requiresVendorPairing: Boolean = false,
 )

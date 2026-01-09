@@ -11,6 +11,7 @@ import com.juul.kable.Scanner
 import com.juul.kable.logs.LogEngine
 import com.juul.kable.logs.Logging
 import com.juul.khronicle.Log
+import dev.sebastiano.camerasync.ble.buildManufacturerDataMap
 import dev.sebastiano.camerasync.domain.model.Camera
 import dev.sebastiano.camerasync.domain.repository.CameraConnection
 import dev.sebastiano.camerasync.domain.repository.CameraRepository
@@ -209,8 +210,18 @@ class PairingViewModel(
                     Log.info(tag = TAG) { "Connecting to ${camera.name ?: camera.macAddress}..." }
                     connection = cameraRepository.connect(camera)
 
+                    // Perform vendor-specific pairing initialization if required
+                    // (e.g., Sony cameras need a specific command written to EE01)
+                    val pairingSuccess = connection.initializePairing()
+                    if (!pairingSuccess) {
+                        Log.error(tag = TAG) { "Vendor-specific pairing initialization failed" }
+                        _state.value =
+                            PairingScreenState.Pairing(camera, error = PairingError.UNKNOWN)
+                        return@launch
+                    }
+
                     // If we get here, pairing was successful (user accepted the dialog)
-                    Log.info(tag = TAG) { "OS pairing successful, adding device to repository..." }
+                    Log.info(tag = TAG) { "Pairing successful, adding device to repository..." }
 
                     // Now add the device to the paired devices repository
                     pairedDevicesRepository.addDevice(camera, enabled = true)
@@ -274,11 +285,20 @@ class PairingViewModel(
 
     /** Converts a BLE advertisement to a Camera by identifying the vendor. */
     private fun PlatformAdvertisement.toCamera(): Camera? {
+        // Build manufacturer data map from the advertisement
+        val mfrData = buildManufacturerDataMap()
+
         val vendor =
-            vendorRegistry.identifyVendor(deviceName = peripheralName ?: name, serviceUuids = uuids)
+            vendorRegistry.identifyVendor(
+                deviceName = peripheralName ?: name,
+                serviceUuids = uuids,
+                manufacturerData = mfrData,
+            )
 
         if (vendor == null) {
-            Log.warn(tag = TAG) { "No vendor recognized for device: ${peripheralName ?: name}" }
+            Log.warn(tag = TAG) {
+                "No vendor recognized for device: ${peripheralName ?: name} (services: $uuids, mfr: ${mfrData.keys})"
+            }
             return null
         }
 

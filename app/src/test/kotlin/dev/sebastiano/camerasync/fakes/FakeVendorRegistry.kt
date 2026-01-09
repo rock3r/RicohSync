@@ -18,8 +18,14 @@ class FakeVendorRegistry : CameraVendorRegistry {
 
     override fun getAllVendors(): List<CameraVendor> = vendors.toList()
 
-    override fun identifyVendor(deviceName: String?, serviceUuids: List<Uuid>): CameraVendor? {
-        return vendors.firstOrNull { it.recognizesDevice(deviceName, serviceUuids) }
+    override fun identifyVendor(
+        deviceName: String?,
+        serviceUuids: List<Uuid>,
+        manufacturerData: Map<Int, ByteArray>,
+    ): CameraVendor? {
+        return vendors.firstOrNull {
+            it.recognizesDevice(deviceName, serviceUuids, manufacturerData)
+        }
     }
 
     override fun getVendorById(vendorId: String): CameraVendor? {
@@ -51,7 +57,11 @@ object FakeCameraVendor : CameraVendor {
     override val gattSpec: CameraGattSpec = FakeGattSpec
     override val protocol: CameraProtocol = FakeProtocol
 
-    override fun recognizesDevice(deviceName: String?, serviceUuids: List<Uuid>): Boolean {
+    override fun recognizesDevice(
+        deviceName: String?,
+        serviceUuids: List<Uuid>,
+        manufacturerData: Map<Int, ByteArray>,
+    ): Boolean {
         return deviceName?.contains("Fake", ignoreCase = true) == true ||
             serviceUuids.any { it == FakeGattSpec.scanFilterServiceUuids.first() }
     }

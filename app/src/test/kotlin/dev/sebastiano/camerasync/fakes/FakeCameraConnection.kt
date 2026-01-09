@@ -34,6 +34,16 @@ class FakeCameraConnection(override val camera: Camera) : CameraConnection {
     var readFirmwareVersionCalled = false
         private set
 
+    var initializePairingCalled = false
+        private set
+
+    var initializePairingResult = true
+
+    override suspend fun initializePairing(): Boolean {
+        initializePairingCalled = true
+        return initializePairingResult
+    }
+
     override suspend fun readFirmwareVersion(): String {
         readFirmwareVersionCalled = true
         return firmwareVersion

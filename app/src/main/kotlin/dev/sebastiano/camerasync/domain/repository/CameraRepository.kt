@@ -54,6 +54,17 @@ interface CameraConnection {
     /** Flow of the connection state. Emits true when connected, false when disconnected. */
     val isConnected: Flow<Boolean>
 
+    /**
+     * Performs vendor-specific pairing initialization.
+     *
+     * Some camera vendors (like Sony) require a specific BLE command to be written after OS-level
+     * bonding to complete the pairing process. This method should be called when the camera is in
+     * pairing mode.
+     *
+     * @return true if pairing was successful or not required, false if pairing failed.
+     */
+    suspend fun initializePairing(): Boolean
+
     /** Reads the camera's firmware version. */
     suspend fun readFirmwareVersion(): String
 

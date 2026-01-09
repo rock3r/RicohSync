@@ -26,7 +26,11 @@ object RicohCameraVendor : CameraVendor {
 
     override val protocol: CameraProtocol = RicohProtocol
 
-    override fun recognizesDevice(deviceName: String?, serviceUuids: List<Uuid>): Boolean {
+    override fun recognizesDevice(
+        deviceName: String?,
+        serviceUuids: List<Uuid>,
+        manufacturerData: Map<Int, ByteArray>,
+    ): Boolean {
         // Ricoh cameras advertise a specific service UUID
         val hasRicohService =
             serviceUuids.any { uuid -> RicohGattSpec.scanFilterServiceUuids.contains(uuid) }

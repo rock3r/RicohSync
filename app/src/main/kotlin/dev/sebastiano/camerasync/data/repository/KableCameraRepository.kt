@@ -9,6 +9,7 @@ import com.juul.kable.State
 import com.juul.kable.WriteType
 import com.juul.kable.logs.Logging
 import com.juul.khronicle.Log
+import dev.sebastiano.camerasync.ble.buildManufacturerDataMap
 import dev.sebastiano.camerasync.domain.model.Camera
 import dev.sebastiano.camerasync.domain.model.GpsLocation
 import dev.sebastiano.camerasync.domain.repository.CameraConnection
@@ -114,12 +115,19 @@ class KableCameraRepository(private val vendorRegistry: CameraVendorRegistry) : 
      * @return A Camera instance if a vendor is recognized, or null if no vendor matches.
      */
     private fun Advertisement.toCamera(): Camera? {
+        // Build manufacturer data map from the advertisement
+        val mfrData = buildManufacturerDataMap()
+
         val vendor =
-            vendorRegistry.identifyVendor(deviceName = peripheralName, serviceUuids = uuids)
+            vendorRegistry.identifyVendor(
+                deviceName = peripheralName,
+                serviceUuids = uuids,
+                manufacturerData = mfrData,
+            )
 
         if (vendor == null) {
             Log.warn(tag = TAG) {
-                "No vendor recognized for device: $peripheralName (services: $uuids)"
+                "No vendor recognized for device: $peripheralName (services: $uuids, mfr: ${mfrData.keys})"
             }
             return null
         }
@@ -151,6 +159,69 @@ internal class KableCameraConnection(
     private val gattSpec = camera.vendor.gattSpec
     private val protocol = camera.vendor.protocol
     private val capabilities = camera.vendor.getCapabilities()
+
+    override suspend fun initializePairing(): Boolean {
+        if (!capabilities.requiresVendorPairing) {
+            Log.info(tag = TAG) {
+                "${camera.vendor.vendorName} cameras do not require vendor-specific pairing"
+            }
+            return true
+        }
+
+        val pairingServiceUuid = gattSpec.pairingServiceUuid
+        val pairingCharUuid = gattSpec.pairingCharacteristicUuid
+
+        if (pairingServiceUuid == null || pairingCharUuid == null) {
+            Log.warn(tag = TAG) {
+                "${camera.vendor.vendorName} requires vendor pairing but no pairing UUIDs configured"
+            }
+            return false
+        }
+
+        val pairingData = protocol.getPairingInitData()
+        if (pairingData == null) {
+            Log.warn(tag = TAG) {
+                "${camera.vendor.vendorName} requires vendor pairing but no pairing data provided"
+            }
+            return false
+        }
+
+        return try {
+            val service =
+                peripheral.services.value.orEmpty().firstOrNull {
+                    it.serviceUuid == pairingServiceUuid
+                }
+
+            if (service == null) {
+                Log.warn(tag = TAG) {
+                    "Pairing service not found: $pairingServiceUuid. " +
+                        "Available services: ${peripheral.services.value?.map { it.serviceUuid }}"
+                }
+                return false
+            }
+
+            val char =
+                service.characteristics.firstOrNull { it.characteristicUuid == pairingCharUuid }
+
+            if (char == null) {
+                Log.warn(tag = TAG) {
+                    "Pairing characteristic not found: $pairingCharUuid. " +
+                        "Available characteristics: ${service.characteristics.map { it.characteristicUuid }}"
+                }
+                return false
+            }
+
+            Log.info(tag = TAG) {
+                "Writing pairing initialization data to ${camera.vendor.vendorName} camera"
+            }
+            peripheral.write(char, pairingData, WriteType.WithResponse)
+            Log.info(tag = TAG) { "Pairing initialization successful" }
+            true
+        } catch (e: Exception) {
+            Log.error(tag = TAG, throwable = e) { "Failed to initialize pairing" }
+            false
+        }
+    }
 
     override suspend fun readFirmwareVersion(): String {
         if (!capabilities.supportsFirmwareVersion) {

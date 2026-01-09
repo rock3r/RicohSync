@@ -20,9 +20,14 @@ interface CameraVendorRegistry {
      *
      * @param deviceName The advertised device name, or null if not available.
      * @param serviceUuids The list of advertised service UUIDs.
+     * @param manufacturerData Map of manufacturer ID to data bytes from the advertisement.
      * @return The matching CameraVendor, or null if no vendor recognizes the device.
      */
-    fun identifyVendor(deviceName: String?, serviceUuids: List<Uuid>): CameraVendor?
+    fun identifyVendor(
+        deviceName: String?,
+        serviceUuids: List<Uuid>,
+        manufacturerData: Map<Int, ByteArray> = emptyMap(),
+    ): CameraVendor?
 
     /**
      * Gets a specific vendor by its ID.
@@ -58,8 +63,14 @@ class DefaultCameraVendorRegistry(private val vendors: List<CameraVendor>) : Cam
 
     override fun getAllVendors(): List<CameraVendor> = vendors
 
-    override fun identifyVendor(deviceName: String?, serviceUuids: List<Uuid>): CameraVendor? {
-        return vendors.firstOrNull { vendor -> vendor.recognizesDevice(deviceName, serviceUuids) }
+    override fun identifyVendor(
+        deviceName: String?,
+        serviceUuids: List<Uuid>,
+        manufacturerData: Map<Int, ByteArray>,
+    ): CameraVendor? {
+        return vendors.firstOrNull { vendor ->
+            vendor.recognizesDevice(deviceName, serviceUuids, manufacturerData)
+        }
     }
 
     override fun getVendorById(vendorId: String): CameraVendor? {
