@@ -27,6 +27,12 @@ class SonyCameraVendorTest {
     }
 
     @Test
+    fun `recognizes device with pairing service UUID`() {
+        val serviceUuids = listOf(SonyGattSpec.PAIRING_SERVICE_UUID)
+        assertTrue(SonyCameraVendor.recognizesDevice("ILCE-7M4", serviceUuids))
+    }
+
+    @Test
     fun `recognizes device regardless of device name`() {
         val serviceUuids = listOf(SonyGattSpec.REMOTE_CONTROL_SERVICE_UUID)
         assertTrue(SonyCameraVendor.recognizesDevice(null, serviceUuids))

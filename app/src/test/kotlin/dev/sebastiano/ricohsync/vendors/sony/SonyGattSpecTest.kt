@@ -82,11 +82,11 @@ class SonyGattSpecTest {
     }
 
     @Test
-    fun `scan filter uses remote control service UUID`() {
-        assertEquals(1, SonyGattSpec.scanFilterServiceUuids.size)
+    fun `scan filter uses remote control and pairing service UUIDs`() {
+        assertEquals(2, SonyGattSpec.scanFilterServiceUuids.size)
         assertEquals(
-            SonyGattSpec.REMOTE_CONTROL_SERVICE_UUID,
-            SonyGattSpec.scanFilterServiceUuids.first(),
+            listOf(SonyGattSpec.REMOTE_CONTROL_SERVICE_UUID, SonyGattSpec.PAIRING_SERVICE_UUID),
+            SonyGattSpec.scanFilterServiceUuids,
         )
     }
 
