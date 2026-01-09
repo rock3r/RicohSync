@@ -15,9 +15,14 @@ val keystorePropertiesFile: File = project.file("keystore.properties")
 
 val keystoreProperties =
     Properties().apply {
+        fun hasReleaseStoreEnv(): Boolean {
+            val env = System.getenv("RELEASE_STORE_FILE") ?: return false
+            return file(env).isFile
+        }
+
         if (keystorePropertiesFile.isFile) {
             load(FileInputStream(keystorePropertiesFile))
-        } else if (file(System.getenv("RELEASE_STORE_FILE")).isFile) {
+        } else if (hasReleaseStoreEnv()) {
             // Fallback to environment variables for CI
             setProperty("keyAlias", System.getenv("RELEASE_KEY_ALIAS"))
             setProperty("keyPassword", System.getenv("RELEASE_KEY_PASSWORD"))
